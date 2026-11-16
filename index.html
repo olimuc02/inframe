@@ -27,7 +27,7 @@
     --accent:#7d7aff; --accent-soft:rgba(125,122,255,.18); --green:#30d158; --red:#ff453a; --orange:#ff9f0a; --bar:rgba(22,22,24,.86); }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Roboto,"Segoe UI","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
 button,input,select,textarea{font:inherit;color:inherit}
 input,textarea,select{font-size:17px}
 button{cursor:pointer}
@@ -203,6 +203,33 @@ button{cursor:pointer}
 .stats b{display:block;font-size:20px}
 .stats span{font-size:12px;color:var(--muted)}
 .stats div+div{border-left:.5px solid var(--sep)}
+/* laptop & desktop: side menu instead of bottom tabs, wider content */
+.sbrand{display:none}
+.varrow{position:absolute;top:50%;transform:translateY(-50%);border:0;background:rgba(255,255,255,.16);color:#fff;width:46px;height:46px;border-radius:50%;font-size:26px;line-height:1;display:none;z-index:2}
+.vimg{position:relative}
+@media (hover:hover){
+  .cell.tap:hover{background:var(--card2)}
+  .tile:hover img{filter:brightness(.9)}
+  .varrow{display:flex;align-items:center;justify-content:center}
+  .varrow:hover{background:rgba(255,255,255,.3)}
+}
+@media (min-width:900px){
+  body.hasnav{padding-left:232px}
+  body.hasnav #app{max-width:940px;padding:0 12px 48px}
+  .tabbar{top:0;right:auto;width:232px;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:2px;padding:calc(var(--sat) + 20px) 12px 20px;border-top:0;border-right:.5px solid var(--sep)}
+  .tabbar button{flex:none;flex-direction:row;gap:12px;font-size:15px;padding:10px 12px;border-radius:10px;justify-content:flex-start;color:var(--ink)}
+  .tabbar button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .tabbar svg{width:22px;height:22px}
+  .tabbar .dot{position:static;margin-left:auto}
+  .sbrand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;padding:0 10px 22px}
+  .sbrand img{width:34px;height:34px;border-radius:8px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px}
+  .grid .tile{border-radius:8px}
+  .large h1{font-size:32px}
+  .asbar{left:calc(50% + 116px);bottom:28px}
+  #toast{bottom:36px}
+  .vwrap img{max-width:calc(100vw - 140px)}
+}
 .asbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 64px);z-index:11;background:var(--orange);color:#fff;font-size:14px;font-weight:600;padding:7px 8px 7px 16px;border-radius:99px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);white-space:nowrap}
 .asbar button{border:0;background:rgba(255,255,255,.25);color:#fff;font-weight:600;font-size:13px;padding:5px 11px;border-radius:99px}
 .linkbox{background:var(--card);border-radius:12px;padding:14px;font-size:14px;word-break:break-all;color:var(--muted);margin-bottom:12px;user-select:all;-webkit-user-select:all}
@@ -289,23 +316,37 @@ async function adminSignIn(){
     const prov = new A.GoogleAuthProvider(); prov.setCustomParameters({login_hint:ADMIN_EMAIL, prompt:'select_account'});
     const res = await A.signInWithPopup(AUTH, prov);
     if (res.user.email !== ADMIN_EMAIL){ await A.signOut(AUTH); return toast("That Google account isn't the InFrame admin."); }
-    const id = 'admin_' + res.user.uid, s = await F.getDoc(ref('users', id));
-    closeSheet(); localStorage.removeItem('inframe_admin_return');
-    if (s.exists()){ prevMe = null; setMe(id); start(); toast('Signed in as admin.'); }
-    else { if (ME && !isAdminId(ME)) prevMe = ME; stopAll(); setMe(null); su = {step:1, first:'', last:'', username:'', admin:id}; renderSignup(); toast('Set up your admin profile.'); }
+    closeSheet(); await finishAdmin(res.user); toast('Signed in as admin.');
   } catch (e){
     console.warn(e);
     const m = {'auth/popup-closed-by-user':'Sign-in cancelled.', 'auth/cancelled-popup-request':'Sign-in cancelled.', 'auth/unauthorized-domain':"Admin sign-in isn't switched on for this website yet.", 'auth/operation-not-allowed':"Google sign-in isn't turned on in Firebase yet.", 'auth/popup-blocked':'Allow pop-ups for this site, then try again.'}[e?.code];
     toast(m || 'Admin sign-in failed.');
   }
 }
+// The admin profile is created automatically as Oliver M. — no setup screens.
+let adminEntry = false; // true when opened from the private admin link
+async function finishAdmin(authUser){
+  const id = 'admin_' + authUser.uid, r = ref('users', id);
+  if (!(await F.getDoc(r)).exists()){
+    let username = null;
+    for (const n of ['oliver', 'oliver.m', 'oliver.admin', 'admin' + Date.now().toString(36).slice(-4)]){ try { await claimUsername(n, id); username = n; break; } catch {} }
+    const now = Date.now();
+    await F.setDoc(r, {isAdmin:true, first:'Oliver', last:'M', username:username || 'oliver', avatar:'', emoji:'', bio:'', descriptor:null, termsVersion:TERMS_VERSION, termsAcceptedAt:now, createdAt:now});
+  }
+  adminEntry = false; prevMe = null; localStorage.removeItem('inframe_admin_return'); setMe(id); start();
+}
 async function adminSignOut(){ await A.signOut(AUTH); forgetAccount(ME); setMe(accounts().find(id => !isAdminId(id)) || null); start(); toast('Signed out of admin.'); }
 function viewAs(id){ localStorage.setItem('inframe_admin_return', ME); closeSheet(); setMe(id, false); start(); toast(`Viewing as ${handle(id)}.`); }
 function backToAdmin(){ const id = localStorage.getItem('inframe_admin_return'); localStorage.removeItem('inframe_admin_return'); setMe(id); start(); }
 function adminGate(){
-  return `<div class="onb"><img class="logo" src="icon-192.png" alt=""><h1>Admin Sign In</h1><p class="hint">The admin account only opens for ${esc(ADMIN_EMAIL)}.</p>
+  return `<div class="onb" id="admingate"><img class="logo" src="icon-192.png" alt=""><h1>InFrame Admin</h1><p class="hint">Only ${esc(ADMIN_EMAIL)} can open the admin account.</p>
     <div class="grow"></div><button class="btn fill full" onclick="adminSignIn()">Sign In With Google</button>
-    <button class="link" onclick="forgetAccount(ME);setMe(accounts().find(id=>!isAdminId(id))||null);start()">Use A Different Account</button></div>`;
+    <button class="link" onclick="leaveAdminGate()">Go To The App Instead</button></div>`;
+}
+function leaveAdminGate(){
+  adminEntry = false;
+  if (isAdminId(ME)){ forgetAccount(ME); setMe(accounts().find(id => !isAdminId(id)) || null); }
+  start();
 }
 
 /* admin panel data: one-time loads of everything, refreshed on demand */
@@ -588,7 +629,7 @@ let camStream = null, camCb = null;
 async function openCamera(cb){
   try { camStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:1280}}}); }
   catch { toast('Camera not available. Choose a photo instead.'); return; }
-  camCb = cb; $('#cam-v').srcObject = camStream; $('#cam').classList.add('show');
+  pushNav(); camCb = cb; $('#cam-v').srcObject = camStream; $('#cam').classList.add('show');
 }
 function closeCamera(){ camStream?.getTracks().forEach(t => t.stop()); camStream = null; $('#cam').classList.remove('show'); }
 function snap(){
@@ -664,7 +705,6 @@ function renderSignup(){
     <div class="fnote">Friends see your first name, last initial and username.</div>
     <div class="grow"></div>
     <button class="btn fill full" onclick="suNext1()">Continue</button>
-    ${su.admin ? '' : `<button class="link" style="font-size:13px;color:var(--muted)" onclick="adminSignIn()">Admin Sign In</button>`}
     ${prevMe ? `<button class="link" onclick="cancelNewAccount()">Back To My Account</button>` : ''}`;
   if (su.step === 2) body = `
     <h1>Face Match Selfie</h1><p class="hint">This is how InFrame finds you in your friends' photos. It's only used for matching and is never posted.</p>${steps}
@@ -725,13 +765,22 @@ function cancelNewAccount(){ const id = prevMe; prevMe = null; setMe(id); start(
 /* ---------- navigation ---------- */
 let view = {name:'tab', tab:'groups'}, stack = [];
 function tab(t){ stack = []; view = {name:'tab', tab:t}; render(); window.scrollTo(0, 0); if (t === 'alerts') markAllRead(); }
-function go(v){ stack.push({view, y:scrollY}); view = {...v, at:Date.now()}; render(); window.scrollTo(0, 0); if (v.name === 'alerts') setTimeout(markAllRead, 600); }
+// Phone back button / swipe-back closes what's open, then steps back a screen.
+function pushNav(){ try { history.pushState({inframe:1}, ''); } catch {} }
+addEventListener('popstate', () => {
+  if ($('#cam').classList.contains('show')) return closeCamera();
+  if ($('#viewer').classList.contains('show')) return closeViewer();
+  if ($('#dim')) return closeSheet();
+  if (stack.length) back();
+});
+function go(v){ pushNav(); stack.push({view, y:scrollY}); view = {...v, at:Date.now()}; render(); window.scrollTo(0, 0); if (v.name === 'alerts') setTimeout(markAllRead, 600); }
 function back(){ const p = stack.pop(); view = p ? p.view : {name:'tab', tab:'groups'}; render(); window.scrollTo(0, p ? p.y : 0); }
 let renderQueued = false;
 function later(){ if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); }
 
 /* ---------- sheets ---------- */
 function openSheet(html){
+  if (!$('#dim')) pushNav();
   closeSheet(true);
   const d = document.createElement('div'); d.className = 'dim'; d.id = 'dim';
   d.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`;
@@ -928,7 +977,7 @@ async function savePhoto(pid){
 
 /* ---------- full-screen photo viewer ---------- */
 let vList = [], vIdx = 0, vBoxes = true;
-async function openViewer(pid, list){ vList = list && list.length ? list : [pid]; vIdx = Math.max(0, vList.indexOf(pid)); $('#viewer').classList.add('show'); document.body.style.overflow = 'hidden'; drawViewer(); }
+async function openViewer(pid, list){ pushNav(); vList = list && list.length ? list : [pid]; vIdx = Math.max(0, vList.indexOf(pid)); $('#viewer').classList.add('show'); document.body.style.overflow = 'hidden'; drawViewer(); }
 function closeViewer(){ $('#viewer').classList.remove('show'); $('#viewer').innerHTML = ''; document.body.style.overflow = ''; }
 function viewerAfterAction(pid){ if (!$('#viewer').classList.contains('show')) return; if (view.name === 'tab' && view.tab === 'inbox'){ vList = vList.filter(x => x !== pid); if (!vList.length) return closeViewer(); vIdx = Math.min(vIdx, vList.length - 1); } setTimeout(drawViewer, 150); }
 async function drawViewer(){
@@ -946,7 +995,7 @@ async function drawViewer(){
     <div class="vtop"><button onclick="closeViewer()" aria-label="Close">✕</button>
       <div class="vt">${esc(e?.name || '')}<div class="vs">${esc(handle(p.uploaderId))} · ${ago(p.createdAt)}${vList.length > 1 ? ` · ${vIdx + 1} of ${vList.length}` : ''}</div></div>
       <button onclick="vBoxes=!vBoxes;$('.vimg').classList.toggle('hidebox',!vBoxes)" aria-label="Show Names" style="font-size:13px;font-weight:700">@</button></div>
-    <div class="vimg ${vBoxes ? '' : 'hidebox'}"><div class="vwrap"><img src="${fullCache.get(pid) || p.thumb}" id="vimg" alt="">${boxes}</div></div>
+    <div class="vimg ${vBoxes ? '' : 'hidebox'}">${vList.length > 1 ? `<button class="varrow" style="left:16px" onclick="step(-1)" aria-label="Previous">‹</button><button class="varrow" style="right:16px" onclick="step(1)" aria-label="Next">›</button>` : ''}<div class="vwrap"><img src="${fullCache.get(pid) || p.thumb}" id="vimg" alt="">${boxes}</div></div>
     <div class="vbot"><div class="rxbar">${REACTS.map(r => `<button class="${mine === r ? 'on' : ''}" onclick="react('${pid}','${r}')">${r}${counts[r] ? `<small>${counts[r]}</small>` : ''}</button>`).join('')}</div>
       <div class="vact">${acts}</div></div>`;
   const full = await getFull(pid); if (full && vList[vIdx] === pid && $('#vimg')) $('#vimg').src = full;
@@ -1011,7 +1060,7 @@ function otherProfile(id){
     ${shared.length ? `<div class="sechead">Groups Together</div><div class="list">${shared.map(g => `<button class="cell tap" onclick="closeSheet();go({name:'group',id:'${g.id}'})">${sq(g)}<div class="main"><div class="t">${esc(g.name)}</div></div><span class="chev">›</span></button>`).join('')}</div>` : ''}`);
 }
 function deviceSheet(){
-  if (isAdminId(ME)) return openSheet(`${sheetHead('Use On Another Device')}<p class="hint">For safety, the admin account has no sign-in link. On your other device, open InFrame and tap <b>Admin Sign In</b> at the bottom of the first screen (or Profile → Switch Account → Admin Sign In).</p>`);
+  if (isAdminId(ME)) return openSheet(`${sheetHead('Use On Another Device')}<p class="hint">On your other device, open your private admin link and sign in with Google:</p><div class="linkbox">${esc(location.origin + location.pathname)}admin/</div><button class="btn tint full" onclick="copyText('${esc(location.origin + location.pathname)}admin/')">Copy Admin Link</button>`);
   const link = `${location.origin}${location.pathname}?login=${ME}`;
   openSheet(`${sheetHead('Use On Another Device')}
     <p class="hint">Open this link on your other phone or computer to sign in there. Keep it private. Anyone with it can use your account.</p>
@@ -1024,7 +1073,7 @@ async function accountsSheet(){
   openSheet(`${sheetHead('Switch Account')}
     ${rows ? `<div class="list">${rows}</div><div style="height:14px"></div>` : ''}
     <div class="list"><button class="cell tap blue" onclick="newAccount()">Create New Account</button>
-      ${isAdminId(ME) ? `<button class="cell tap red" onclick="closeSheet();adminSignOut()">Sign Out Of Admin</button>` : `<button class="cell tap blue" onclick="adminSignIn()">Admin Sign In</button>`}</div>`);
+      ${isAdminId(ME) ? `<button class="cell tap red" onclick="closeSheet();adminSignOut()">Sign Out Of Admin</button>` : ''}</div>`);
 }
 function switchTo(id){ closeSheet(); if (id === ME) return; localStorage.removeItem('inframe_admin_return'); setMe(id); start(); }
 function signOutLocal(){ forgetAccount(ME); const next = accounts()[0] || null; setMe(next); start(); }
@@ -1062,14 +1111,22 @@ const ICONS = {
 };
 function tabbar(){
   const n = pending().length, b = (k, l) => `<button class="${view.name === 'tab' && view.tab === k ? 'on' : ''}" onclick="tab('${k}')">${ICONS[k]}${l}${k === 'inbox' && n ? `<span class="dot">${n}</span>` : ''}</button>`;
-  return `<nav class="tabbar">${b('inbox', 'Inbox')}${b('photos', 'Photos')}${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
+  return `<nav class="tabbar"><div class="sbrand"><img src="icon-192.png" alt="">InFrame</div>${b('inbox', 'Inbox')}${b('photos', 'Photos')}${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
 }
 function bell(){ const n = unreadCount(); return `<button class="iconbtn" onclick="go({name:'alerts'})" aria-label="Notifications">${ICONS.bell}${n ? `<span class="dot">${n}</span>` : ''}</button>`; }
 function topBar(title, right){ return `<div class="nav"><button class="back" onclick="back()">${chevron} Back</button><div class="ttl">${esc(title || '')}</div><span class="spacer"></span>${right || ''}</div>`; }
 const tileHTML = (p, list, tag) => `<button class="tile" onclick="openViewer('${p.id}',${esc(JSON.stringify(list))})"><img src="${p.thumb}" alt="" loading="lazy">${tag ? `<span class="tag">${tag}</span>` : ''}${Object.keys(p.reactions || {}).length ? `<span class="rx">${[...new Set(Object.values(p.reactions))].slice(0, 3).join('')}</span>` : ''}</button>`;
+// Android / Chrome / Edge offer a real install prompt; iPhone needs Share → Add to Home Screen.
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; later(); });
+addEventListener('appinstalled', () => { installEvt = null; later(); });
+async function installApp(){ if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; render(); }
 function installCallout(){
-  if (!isIOS || standalone || localStorage.getItem('inframe_hide_install')) return '';
-  return `<div class="callout"><img src="${ICON}" alt=""><div style="flex:1"><b>Get The App</b><br>Tap the Share button, then <b>Add to Home Screen</b>. You'll get notifications and a full-screen app.</div><button class="x" onclick="localStorage.setItem('inframe_hide_install',1);render()" aria-label="Dismiss">✕</button></div>`;
+  if (standalone || localStorage.getItem('inframe_hide_install')) return '';
+  const x = `<button class="x" onclick="localStorage.setItem('inframe_hide_install',1);render()" aria-label="Dismiss">✕</button>`;
+  if (installEvt) return `<div class="callout"><img src="${ICON}" alt=""><div style="flex:1"><b>Get The App</b><br>Install InFrame for a full-screen app and notifications.<br><button class="btn sm fill" style="margin-top:8px" onclick="installApp()">Install App</button></div>${x}</div>`;
+  if (isIOS) return `<div class="callout"><img src="${ICON}" alt=""><div style="flex:1"><b>Get The App</b><br>Tap the Share button, then <b>Add to Home Screen</b>. You'll get notifications and a full-screen app.</div>${x}</div>`;
+  return '';
 }
 function screenInbox(){
   const items = pending().map(d => photo(d.photoId)).sort((a, b) => b.createdAt - a.createdAt), ids = items.map(p => p.id);
@@ -1162,8 +1219,9 @@ function screenProfile(){
 }
 function render(){
   if (!F) return;
+  document.body.classList.remove('hasnav');
+  if (adminEntry || (isAdminId(ME) && !adminAuthed())){ if (!$('#admingate')) $('#app').innerHTML = adminGate(); return; }
   if (!ME){ if (!$('#signup')) renderSignup(); return; }
-  if (isAdminId(ME) && !adminAuthed()){ $('#app').innerHTML = adminGate(); return; }
   if (!me()){ $('#app').innerHTML = '<div class="loading">Loading…</div>'; return; }
   let html = null;
   if (view.name === 'tab') html = ({inbox:screenInbox, photos:screenPhotos, groups:screenGroups, profile:screenProfile}[view.tab] || screenGroups)();
@@ -1175,6 +1233,7 @@ function render(){
   const ret = localStorage.getItem('inframe_admin_return');
   const asBar = ret && ret !== ME && adminAuthed() ? `<div class="asbar">Viewing as ${esc(handle(ME))}<button onclick="backToAdmin()">Back To Admin</button></div>` : '';
   $('#app').innerHTML = html + asBar + tabbar();
+  document.body.classList.add('hasnav');
   if (document.querySelector('#viewer.show')) drawViewer();
 }
 
@@ -1186,6 +1245,10 @@ function start(){ stopAll(); stack = []; view = {name:'tab', tab:'groups'}; if (
   try { await initFirebase(); } catch (e){ $('#app').innerHTML = '<div class="empty" style="padding-top:30vh"><b>Can\'t Connect</b>Check your internet connection and reopen InFrame.</div>'; return; }
   const p = new URLSearchParams(location.search);
   if (p.get('join')) sessionStorage.setItem('inframe_join', p.get('join'));
+  if (p.has('admin')){
+    adminEntry = true;
+    if (adminAuthed()){ try { if (p.toString()) history.replaceState(null, '', location.pathname); await finishAdmin(AUTH.currentUser); return; } catch (e){ console.warn(e); } }
+  }
   if (p.get('login') && isAdminId(p.get('login'))) toast('The admin account can only sign in with Google.');
   else if (p.get('login')){ const s = await F.getDoc(ref('users', p.get('login'))); if (s.exists()){ setMe(s.id); toast(`Signed in as @${s.data().username}.`); } else toast("That sign-in link isn't valid."); }
   if (p.toString()) history.replaceState(null, '', location.pathname);

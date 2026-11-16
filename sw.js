@@ -1,6 +1,6 @@
 // InFrame service worker: makes the app installable, keeps the app shell available, opens the app from notifications.
-const CACHE = 'inframe-v1';
-const SHELL = ['./', 'index.html', 'terms.html', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png'];
+const CACHE = 'inframe-v2';
+const SHELL = ['./', 'index.html', 'terms.html', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png', 'admin/index.html'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
