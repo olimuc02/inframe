@@ -1,12 +1,21 @@
 rules_version = '2';
 // InFrame prototype rules: only InFrame's own collections are reachable, with basic shape checks.
-// Before a wide public launch, add Firebase Authentication and tie writes to the signed-in user.
+// The admin account (users doc id "admin_<uid>", isAdmin: true) can only be created or changed by
+// someone signed in with Google as the admin email. Regular members don't sign in yet.
+// Before a wide public launch, add sign-in for everyone and tie writes to the signed-in user.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'muckadigital@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
     match /inframe_users/{id} {
-      allow read, delete: if true;
+      allow read: if true;
+      allow delete: if !id.matches('admin_.*') || isAdmin();
       allow create, update: if request.resource.data.username is string
-        && request.resource.data.first is string && request.resource.data.first.size() <= 40;
+        && request.resource.data.first is string && request.resource.data.first.size() <= 40
+        && ((!id.matches('admin_.*') && request.resource.data.get('isAdmin', false) == false) || isAdmin());
     }
     match /inframe_usernames/{name} {
       allow read, delete: if true;

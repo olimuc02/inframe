@@ -203,6 +203,8 @@ button{cursor:pointer}
 .stats b{display:block;font-size:20px}
 .stats span{font-size:12px;color:var(--muted)}
 .stats div+div{border-left:.5px solid var(--sep)}
+.asbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 64px);z-index:11;background:var(--orange);color:#fff;font-size:14px;font-weight:600;padding:7px 8px 7px 16px;border-radius:99px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);white-space:nowrap}
+.asbar button{border:0;background:rgba(255,255,255,.25);color:#fff;font-weight:600;font-size:13px;padding:5px 11px;border-radius:99px}
 .linkbox{background:var(--card);border-radius:12px;padding:14px;font-size:14px;word-break:break-all;color:var(--muted);margin-bottom:12px;user-select:all;-webkit-user-select:all}
 </style>
 </head>
@@ -227,6 +229,7 @@ const FB_CONFIG = {
   appId:'1:26746903577:web:ad6e686534a1a3d72c5e88',
 };
 const TERMS_VERSION = '2026-11-15';
+const ADMIN_EMAIL = 'muckadigital@gmail.com'; // the only Google account that can open the admin account
 const MATCH = 0.55; // face distance cut-off; lower = stricter
 const FACEAPI = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/';
 const EMOJIS = ['😎','🤙','✌️','🫶','🌴','🏖️','🌊','🏄','🏔️','🏕️','🚲','🏃','⚽','🏀','🎾','⛳','🎸','🎧','🪩','🎉','🍕','🌮','🍣','☕','🍻','🍷','🍓','🐶','🐱','🦋','🌵','🌻','🔥','✨','🌙','☀️','📸','✈️','🎮','🎨'];
@@ -253,21 +256,146 @@ let ME = localStorage.getItem('inframe_me') || null;
 function accounts(){ try { return JSON.parse(localStorage.getItem('inframe_accounts') || '[]'); } catch { return []; } }
 function rememberAccount(id){ const a = accounts().filter(x => x !== id); a.unshift(id); localStorage.setItem('inframe_accounts', JSON.stringify(a)); }
 function forgetAccount(id){ localStorage.setItem('inframe_accounts', JSON.stringify(accounts().filter(x => x !== id))); }
-function setMe(id){ ME = id; if (id){ localStorage.setItem('inframe_me', id); rememberAccount(id); } else localStorage.removeItem('inframe_me'); }
+function setMe(id, remember = true){ ME = id; if (id){ localStorage.setItem('inframe_me', id); if (remember) rememberAccount(id); } else localStorage.removeItem('inframe_me'); }
 
 /* ---------- Firebase ---------- */
-let F = null, db = null;
+let F = null, db = null, A = null, AUTH = null;
 const col = n => F.collection(db, 'inframe_' + n);
 const ref = (n, id) => F.doc(db, 'inframe_' + n, id);
 async function initFirebase(){
-  const [app, fs] = await Promise.all([
+  const [app, fs, au] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'),
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),
   ]);
-  F = fs;
+  F = fs; A = au;
   const a = app.initializeApp(FB_CONFIG);
   try { db = fs.initializeFirestore(a, {localCache: fs.persistentLocalCache({tabManager: fs.persistentMultipleTabManager()})}); }
   catch { db = fs.getFirestore(a); }
+  AUTH = au.getAuth(a);
+  await new Promise(r => { const off = au.onAuthStateChanged(AUTH, () => { off(); r(); }); });
+  au.onAuthStateChanged(AUTH, () => later());
+}
+
+/* ---------- admin (Google sign-in, locked to ADMIN_EMAIL) ---------- */
+const adminAuthed = () => !!(AUTH?.currentUser && AUTH.currentUser.email === ADMIN_EMAIL && AUTH.currentUser.emailVerified);
+const isAdminId = id => typeof id === 'string' && id.startsWith('admin_');
+const isAdminNow = () => !!(isAdminId(ME) && me()?.isAdmin && adminAuthed());
+async function adminSignIn(){
+  try {
+    const prov = new A.GoogleAuthProvider(); prov.setCustomParameters({login_hint:ADMIN_EMAIL, prompt:'select_account'});
+    const res = await A.signInWithPopup(AUTH, prov);
+    if (res.user.email !== ADMIN_EMAIL){ await A.signOut(AUTH); return toast("That Google account isn't the InFrame admin."); }
+    const id = 'admin_' + res.user.uid, s = await F.getDoc(ref('users', id));
+    closeSheet(); localStorage.removeItem('inframe_admin_return');
+    if (s.exists()){ prevMe = null; setMe(id); start(); toast('Signed in as admin.'); }
+    else { if (ME && !isAdminId(ME)) prevMe = ME; stopAll(); setMe(null); su = {step:1, first:'', last:'', username:'', admin:id}; renderSignup(); toast('Set up your admin profile.'); }
+  } catch (e){
+    console.warn(e);
+    const m = {'auth/popup-closed-by-user':'Sign-in cancelled.', 'auth/cancelled-popup-request':'Sign-in cancelled.', 'auth/unauthorized-domain':"Admin sign-in isn't switched on for this website yet.", 'auth/operation-not-allowed':"Google sign-in isn't turned on in Firebase yet.", 'auth/popup-blocked':'Allow pop-ups for this site, then try again.'}[e?.code];
+    toast(m || 'Admin sign-in failed.');
+  }
+}
+async function adminSignOut(){ await A.signOut(AUTH); forgetAccount(ME); setMe(accounts().find(id => !isAdminId(id)) || null); start(); toast('Signed out of admin.'); }
+function viewAs(id){ localStorage.setItem('inframe_admin_return', ME); closeSheet(); setMe(id, false); start(); toast(`Viewing as ${handle(id)}.`); }
+function backToAdmin(){ const id = localStorage.getItem('inframe_admin_return'); localStorage.removeItem('inframe_admin_return'); setMe(id); start(); }
+function adminGate(){
+  return `<div class="onb"><img class="logo" src="icon-192.png" alt=""><h1>Admin Sign In</h1><p class="hint">The admin account only opens for ${esc(ADMIN_EMAIL)}.</p>
+    <div class="grow"></div><button class="btn fill full" onclick="adminSignIn()">Sign In With Google</button>
+    <button class="link" onclick="forgetAccount(ME);setMe(accounts().find(id=>!isAdminId(id))||null);start()">Use A Different Account</button></div>`;
+}
+
+/* admin panel data: one-time loads of everything, refreshed on demand */
+let ADM = null, admLoading = false;
+async function loadAdmin(){
+  if (admLoading) return; admLoading = true; busy('Loading Admin Data…');
+  try {
+    const all = async c => (await F.getDocs(col(c))).docs.map(d => ({id:d.id, ...d.data()}));
+    const [users, groups, events, photos] = await Promise.all(['users', 'groups', 'events', 'photos'].map(all));
+    ADM = {users, groups, events, photos};
+    photos.forEach(p => { if (!C.photos[p.id]) C.extra[p.id] = p; });
+    events.forEach(e => { if (!evt(e.id)) C.extraEvents[e.id] = e; });
+    users.forEach(u => { if (!C.users[u.id]) C.users[u.id] = u; });
+  } catch (e){ console.warn(e); toast("Couldn't load admin data."); ADM = {users:[], groups:[], events:[], photos:[]}; }
+  admLoading = false; busy(); render();
+}
+function screenAdmin(){
+  if (!isAdminNow()) return null;
+  if (!ADM){ loadAdmin(); return topBar('Admin') + '<div class="loading">Loading…</div>'; }
+  const seg = view.seg || 'overview', sb = (k, l) => `<button class="${seg === k ? 'on' : ''}" onclick="view.seg='${k}';render()">${l}</button>`;
+  let body = '';
+  if (seg === 'overview'){
+    const faces = ADM.users.filter(u => u.descriptor).length, mb = Math.round(ADM.photos.length * .45);
+    body = `<div class="stats"><div><b>${ADM.users.length}</b><span>People</span></div><div><b>${ADM.groups.length}</b><span>Groups</span></div><div><b>${ADM.events.length}</b><span>Events</span></div></div>
+      <div class="stats" style="margin-top:10px"><div><b>${ADM.photos.length}</b><span>Photos</span></div><div><b>${faces}</b><span>Face Selfies</span></div><div><b>~${mb} MB</b><span>Of 1 GB Free</span></div></div>
+      <div class="sechead">Newest People</div><div class="list" style="--inset:64px">${[...ADM.users].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5).map(admUserCell).join('') || '<div class="cell"><div class="main s">Nobody yet.</div></div>'}</div>
+      <div style="height:20px"></div><div class="list"><button class="cell tap blue" onclick="ADM=null;render()">Refresh Data</button></div>`;
+  } else if (seg === 'people'){
+    body = `<div class="list" style="--inset:64px">${[...ADM.users].sort((a, b) => (a.first || '').localeCompare(b.first || '')).map(admUserCell).join('') || '<div class="cell"><div class="main s">Nobody yet.</div></div>'}</div>`;
+  } else if (seg === 'groups'){
+    const cell = (kind, t) => `<button class="cell tap" onclick="admThingSheet('${kind}','${t.id}')">${sq(t)}<div class="main"><div class="t">${esc(t.name)}</div><div class="s">${kind === 'group' ? 'Group' : t.groupId ? 'Event in ' + esc(ADM.groups.find(g => g.id === t.groupId)?.name || 'a group') : 'Single Event'} · ${plural(kind === 'group' ? t.members.length : (t.groupId ? (ADM.groups.find(g => g.id === t.groupId)?.members.length || 0) : t.members.length), 'member')}</div></div><span class="chev">›</span></button>`;
+    body = `<div class="sechead" style="margin-top:0">Groups</div><div class="list" style="--inset:72px">${ADM.groups.map(g => cell('group', g)).join('') || '<div class="cell"><div class="main s">None yet.</div></div>'}</div>
+      <div class="sechead">Events</div><div class="list" style="--inset:72px">${ADM.events.map(e => cell('event', e)).join('') || '<div class="cell"><div class="main s">None yet.</div></div>'}</div>`;
+  } else {
+    const ps = [...ADM.photos].sort((a, b) => b.createdAt - a.createdAt).slice(0, 120), ids = ps.map(p => p.id);
+    body = ps.length ? `<p class="hint">Newest ${ps.length} photos across the whole app. Tap one to see or delete it.</p><div class="grid">${ps.map(p => tileHTML(p, ids, '')).join('')}</div>` : '<div class="empty"><b>No Photos Yet</b></div>';
+  }
+  return `${topBar('Admin')}<div class="large"><h1>Admin</h1></div><div class="content"><div class="seg" style="margin-top:4px">${sb('overview', 'Overview')}${sb('people', 'People')}${sb('groups', 'Groups')}${sb('photos', 'Photos')}</div>${body}</div>`;
+}
+function admUserCell(u){ return `<button class="cell tap" onclick="admUserSheet('${u.id}')">${avatar(u, 40)}<div class="main"><div class="t">${esc(fullName(u))}${u.isAdmin ? ' · Admin' : ''}</div><div class="s">@${esc(u.username)} · joined ${u.createdAt ? ago(u.createdAt) : '?'}</div></div><span class="chev">›</span></button>`; }
+function admUserSheet(id){
+  const u = ADM.users.find(x => x.id === id); if (!u) return;
+  const gs = ADM.groups.filter(g => g.members.includes(id)), ups = ADM.photos.filter(p => p.uploaderId === id).length, inP = ADM.photos.filter(p => (p.matched || []).includes(id)).length;
+  openSheet(`${sheetHead(esc(fullName(u)))}
+    <div class="prof">${avatar(u, 96, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
+    <div class="stats"><div><b>${inP}</b><span>Matched In</span></div><div><b>${ups}</b><span>Uploads</span></div><div><b>${gs.length}</b><span>Groups</span></div></div>
+    <div style="height:16px"></div><div class="list">
+      <div class="cell"><div class="main">Face Selfie</div><span class="val">${u.descriptor ? 'On' : 'Off'}</span></div>
+      <div class="cell"><div class="main">Joined</div><span class="val">${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '?'}</span></div>
+      <div class="cell"><div class="main">Agreed To Terms</div><span class="val">${u.termsAcceptedAt ? new Date(u.termsAcceptedAt).toLocaleDateString() : 'No'}</span></div></div>
+    ${id === ME ? '' : `<div style="height:16px"></div><div class="list"><button class="cell tap blue" onclick="viewAs('${id}')">View The App As @${esc(u.username)}</button></div>
+    <div class="fnote" style="margin-top:6px">Anything you do while viewing (keeping photos, reacting) is done as them.</div>
+    <div class="list"><button class="cell tap red" onclick="admDeleteUser('${id}')">Delete Account & Face Data</button></div>`}`);
+}
+function admThingSheet(kind, id){
+  const t = (kind === 'group' ? ADM.groups : ADM.events).find(x => x.id === id); if (!t) return;
+  const mem = kind === 'group' ? t.members : t.groupId ? (ADM.groups.find(g => g.id === t.groupId)?.members || []) : t.members;
+  const eids = kind === 'group' ? ADM.events.filter(e => e.groupId === id).map(e => e.id) : [id], photos = ADM.photos.filter(p => eids.includes(p.eventId)).length;
+  const canJoin = !(kind === 'event' && t.groupId), member = mem.includes(ME);
+  openSheet(`${sheetHead(kind === 'group' ? 'Group' : 'Event')}
+    <div class="hero">${sq(t, true)}<h1>${esc(t.name)}</h1><div class="s">${plural(mem.length, 'member')} · ${plural(photos, 'photo')}${kind === 'group' ? ' · ' + plural(eids.length, 'event') : ''}</div>
+    <div class="stack" style="justify-content:center;margin:14px 0 6px">${mem.slice(0, 8).map(m => avatar(C.users[m], 34)).join('')}</div></div>
+    <div style="height:12px"></div><div class="list">
+      ${member ? `<button class="cell tap blue" onclick="closeSheet();go(${esc(JSON.stringify(kind === 'group' ? {name:'group', id} : {name:'event', id, seg:'mine'}))})">Open</button>` : canJoin ? `<button class="cell tap blue" onclick="admJoin('${kind}','${id}')">Join As Admin</button>` : ''}
+      ${t.inviteCode ? `<button class="cell tap blue" onclick="copyText('${location.origin}${location.pathname}?join=${t.inviteCode}')">Copy Invite Link</button>` : ''}</div>
+    <div style="height:16px"></div><div class="list"><button class="cell tap red" onclick="admDeleteThing('${kind}','${id}')">Delete ${kind === 'group' ? 'Group' : 'Event'} & All Its Photos</button></div>`);
+}
+async function admJoin(kind, id){ await F.updateDoc(ref(kind === 'group' ? 'groups' : 'events', id), {members:F.arrayUnion(ME)}); closeSheet(); ADM = null; toast('Joined.'); }
+async function commitOps(ops){ for (let i = 0; i < ops.length; i += 400){ const b = F.writeBatch(db); ops.slice(i, i + 400).forEach(f => f(b)); await b.commit(); } }
+async function admDeleteThing(kind, id){
+  const t = (kind === 'group' ? ADM.groups : ADM.events).find(x => x.id === id);
+  if (!confirm(`Delete ${t.name} and all of its photos for everyone? This can't be undone.`)) return;
+  busy('Deleting…');
+  try {
+    const eids = kind === 'group' ? (await F.getDocs(F.query(col('events'), F.where('groupId', '==', id)))).docs.map(d => d.id) : [id], ops = [];
+    for (let i = 0; i < eids.length; i += 30){
+      const chunk = eids.slice(i, i + 30);
+      const [ps, ds] = await Promise.all([F.getDocs(F.query(col('photos'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('deliveries'), F.where('eventId', 'in', chunk)))]);
+      ps.docs.forEach(d => { ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); });
+      ds.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+    }
+    eids.forEach(e => ops.push(b => b.delete(ref('events', e))));
+    if (kind === 'group') ops.push(b => b.delete(ref('groups', id)));
+    await commitOps(ops); closeSheet(); toast(`${t.name} deleted.`);
+  } catch (e){ console.warn(e); toast("Couldn't delete everything. Try again."); }
+  ADM = null; busy(); render();
+}
+async function admDeleteUser(id){
+  const u = ADM.users.find(x => x.id === id);
+  if (!confirm(`Delete @${u.username} and all their face data? This can't be undone.`)) return;
+  busy('Deleting…');
+  try { await deleteUserData(id, u.username); closeSheet(); toast(`@${u.username} deleted.`); } catch (e){ console.warn(e); toast("Couldn't delete everything. Try again."); }
+  ADM = null; busy(); render();
 }
 
 /* ---------- synced data ---------- */
@@ -523,7 +651,7 @@ function renderSignup(){
   let body = '';
   if (su.step === 1) body = `
     <img class="logo" src="icon-192.png" alt="">
-    <h1>InFrame</h1><p class="hint">Snap together. Everyone gets the photos they're in.</p>
+    <h1>InFrame</h1><p class="hint">${su.admin ? 'Set up your admin profile. You can use the app like everyone else, plus the Admin panel.' : "Snap together. Everyone gets the photos they're in."}</p>
     ${inviteBannerHTML()}${steps}
     <div class="field">
       <label><span>First Name</span><input id="su-first" value="${esc(su.first)}" autocomplete="given-name" placeholder="Required"></label>
@@ -533,7 +661,7 @@ function renderSignup(){
     <div class="fnote">Friends see your first name, last initial and username.</div>
     <div class="grow"></div>
     <button class="btn fill full" onclick="suNext1()">Continue</button>
-    <button class="link" onclick="useTestAccount()">Use Test Account</button>
+    ${su.admin ? '' : `<button class="link" style="font-size:13px;color:var(--muted)" onclick="adminSignIn()">Admin Sign In</button>`}
     ${prevMe ? `<button class="link" onclick="cancelNewAccount()">Back To My Account</button>` : ''}`;
   if (su.step === 2) body = `
     <h1>Face Match Selfie</h1><p class="hint">This is how InFrame finds you in your friends' photos. It's only used for matching and is never posted.</p>${steps}
@@ -571,11 +699,13 @@ function suNext2(){
 async function suCreate(){
   if (!$('#su-terms').checked) return toast('Please agree to the Terms to continue.');
   const btn = $('#su-go'); btn.disabled = true;
-  const id = uid();
+  if (su.admin && !adminAuthed()){ btn.disabled = false; return adminSignIn(); }
+  const id = su.admin || uid();
   try {
     await claimUsername(su.username, id);
     const now = Date.now();
     await F.setDoc(ref('users', id), {
+      isAdmin:!!su.admin,
       first:su.first[0].toUpperCase() + su.first.slice(1), last:su.last, username:su.username,
       avatar:pickedAvatar || face.thumb, emoji:pickedEmoji, bio:$('#su-bioline').value.trim(),
       faceThumb:face.thumb, descriptor:face.descriptor,
@@ -588,26 +718,6 @@ async function suCreate(){
 let prevMe = null;
 function newAccount(){ prevMe = ME; closeSheet(); stopAll(); setMe(null); su = {step:1, first:'', last:'', username:''}; renderSignup(); }
 function cancelNewAccount(){ const id = prevMe; prevMe = null; setMe(id); start(); }
-
-/* ---------- test account ---------- */
-async function useTestAccount(){
-  busy('Opening Test Account…');
-  try {
-    const now = Date.now();
-    if (!(await F.getDoc(ref('users', 'test'))).exists()){
-      await F.setDoc(ref('usernames', 'test'), {userId:'test'});
-      await F.setDoc(ref('users', 'test'), {first:'Test', last:'T', username:'test', avatar:'', emoji:'🧪', bio:'Shared test account', isTest:true, descriptor:null, termsVersion:TERMS_VERSION, createdAt:now});
-    }
-    const g = ref('groups', 'test-group');
-    if (!(await F.getDoc(g)).exists()) await F.setDoc(g, {name:'Test Group', emoji:'🎉', members:['test'], inviteCode:'testgroup', createdBy:'test', createdAt:now});
-    else await F.updateDoc(g, {members:F.arrayUnion('test')});
-    const e = ref('events', 'test-event');
-    if (!(await F.getDoc(e)).exists()) await F.setDoc(e, {name:'Test Event', emoji:'📸', date:today(), groupId:'test-group', members:[], inviteCode:'testevent', createdBy:'test', createdAt:now});
-    prevMe = null; closeSheet(); setMe('test'); start();
-    toast('Signed in as the Test Account.');
-  } catch (e){ console.warn(e); toast("Couldn't open the Test Account."); }
-  busy();
-}
 
 /* ---------- navigation ---------- */
 let view = {name:'tab', tab:'groups'}, stack = [];
@@ -803,6 +913,7 @@ async function deletePhoto(pid){
   if (!confirm('Delete this photo for everyone?')) return;
   const ds = await F.getDocs(F.query(col('deliveries'), F.where('photoId', '==', pid)));
   const b = F.writeBatch(db); ds.docs.forEach(d => b.delete(d.ref)); b.delete(ref('photos', pid)); b.delete(ref('images', pid)); await b.commit();
+  if (ADM) ADM.photos = ADM.photos.filter(x => x.id !== pid);
   closeViewer(); toast('Photo deleted.');
 }
 async function savePhoto(pid){
@@ -827,7 +938,7 @@ async function drawViewer(){
   if (d?.status === 'pending') acts = `<button class="btn green" onclick="decide('${pid}','keep')">Keep</button><button class="btn" onclick="decide('${pid}','skip')">Skip</button><button class="btn" onclick="decide('${pid}','notme')">Not Me</button>`;
   else if (!d && isUncat(p) && eventMembers(e).includes(ME)) acts = `<button class="btn fill" onclick="claim('${pid}')">I'm In This One</button>`;
   acts += `<button class="btn" onclick="savePhoto('${pid}')">Save</button>`;
-  if (p.uploaderId === ME) acts += `<button class="btn red" onclick="deletePhoto('${pid}')">Delete</button>`;
+  if (p.uploaderId === ME || isAdminNow()) acts +=`<button class="btn red" onclick="deletePhoto('${pid}')">Delete</button>`;
   $('#viewer').innerHTML = `
     <div class="vtop"><button onclick="closeViewer()" aria-label="Close">✕</button>
       <div class="vt">${esc(e?.name || '')}<div class="vs">${esc(handle(p.uploaderId))} · ${ago(p.createdAt)}${vList.length > 1 ? ` · ${vIdx + 1} of ${vList.length}` : ''}</div></div>
@@ -897,39 +1008,44 @@ function otherProfile(id){
     ${shared.length ? `<div class="sechead">Groups Together</div><div class="list">${shared.map(g => `<button class="cell tap" onclick="closeSheet();go({name:'group',id:'${g.id}'})">${sq(g)}<div class="main"><div class="t">${esc(g.name)}</div></div><span class="chev">›</span></button>`).join('')}</div>` : ''}`);
 }
 function deviceSheet(){
+  if (isAdminId(ME)) return openSheet(`${sheetHead('Use On Another Device')}<p class="hint">For safety, the admin account has no sign-in link. On your other device, open InFrame and tap <b>Admin Sign In</b> at the bottom of the first screen (or Profile → Switch Account → Admin Sign In).</p>`);
   const link = `${location.origin}${location.pathname}?login=${ME}`;
   openSheet(`${sheetHead('Use On Another Device')}
     <p class="hint">Open this link on your other phone or computer to sign in there. Keep it private. Anyone with it can use your account.</p>
     <div class="linkbox">${esc(link)}</div><button class="btn tint full" onclick="copyText('${esc(link)}')">Copy Link</button>`);
 }
 async function accountsSheet(){
-  const ids = accounts().filter(id => id !== 'test');
-  for (const id of ids) if (!C.users[id]){ const s = await F.getDoc(ref('users', id)); if (s.exists()) C.users[id] = {id, ...s.data()}; else forgetAccount(id); }
-  const rows = accounts().filter(id => id !== 'test' && C.users[id]).map(id => { const u = C.users[id];
-    return `<button class="cell tap" onclick="switchTo('${id}')">${avatar(u, 40)}<div class="main"><div class="t">${esc(fullName(u))}</div><div class="s">@${esc(u.username)}</div></div>${id === ME ? '<span class="val">✓</span>' : ''}</button>`; }).join('');
+  for (const id of accounts()) if (!C.users[id]){ const s = await F.getDoc(ref('users', id)); if (s.exists()) C.users[id] = {id, ...s.data()}; else forgetAccount(id); }
+  const rows = accounts().filter(id => C.users[id]).map(id => { const u = C.users[id];
+    return `<button class="cell tap" onclick="switchTo('${id}')">${avatar(u, 40)}<div class="main"><div class="t">${esc(fullName(u))}${isAdminId(id) ? ' · Admin' : ''}</div><div class="s">@${esc(u.username)}</div></div>${id === ME ? '<span class="val">✓</span>' : ''}</button>`; }).join('');
   openSheet(`${sheetHead('Switch Account')}
-    <div class="list">${rows}<button class="cell tap" onclick="${ME === 'test' ? 'closeSheet()' : 'useTestAccount()'}"><span class="sq" style="width:40px;height:40px;font-size:20px">🧪</span><div class="main"><div class="t">Test Account</div><div class="s">@test · shared for testing</div></div>${ME === 'test' ? '<span class="val">✓</span>' : ''}</button></div>
-    <div style="height:14px"></div><div class="list"><button class="cell tap blue" onclick="newAccount()">Create New Account</button></div>`);
+    ${rows ? `<div class="list">${rows}</div><div style="height:14px"></div>` : ''}
+    <div class="list"><button class="cell tap blue" onclick="newAccount()">Create New Account</button>
+      ${isAdminId(ME) ? `<button class="cell tap red" onclick="closeSheet();adminSignOut()">Sign Out Of Admin</button>` : `<button class="cell tap blue" onclick="adminSignIn()">Admin Sign In</button>`}</div>`);
 }
-function switchTo(id){ closeSheet(); if (id === ME) return; setMe(id); start(); }
+function switchTo(id){ closeSheet(); if (id === ME) return; localStorage.removeItem('inframe_admin_return'); setMe(id); start(); }
 function signOutLocal(){ forgetAccount(ME); const next = accounts()[0] || null; setMe(next); start(); }
 async function deleteAccount(){
   const u = me(); if (!confirm(`Delete @${u.username} and all your face data? This can't be undone.`)) return;
   busy('Deleting Account…');
   try {
-    const q = (c, f, op, v) => F.getDocs(F.query(col(c), F.where(f, op, v)));
-    const [ds, ns, ps, gs, es] = await Promise.all([q('deliveries', 'userId', '==', ME), q('notifications', 'userId', '==', ME), q('photos', 'matched', 'array-contains', ME), q('groups', 'members', 'array-contains', ME), q('events', 'members', 'array-contains', ME)]);
-    const ops = [];
-    ds.docs.forEach(d => ops.push(b => b.delete(d.ref))); ns.docs.forEach(d => ops.push(b => b.delete(d.ref)));
-    ps.docs.forEach(d => ops.push(b => b.update(d.ref, {faces:d.data().faces.map(f => f.matchId === ME ? {...f, matchId:null} : f), matched:F.arrayRemove(ME)})));
-    gs.docs.concat(es.docs).forEach(d => ops.push(b => b.update(d.ref, {members:F.arrayRemove(ME)})));
-    if (ME !== 'test') ops.push(b => b.delete(ref('usernames', u.username)));
-    ops.push(b => b.delete(ref('users', ME)));
-    for (let i = 0; i < ops.length; i += 400){ const b = F.writeBatch(db); ops.slice(i, i + 400).forEach(f => f(b)); await b.commit(); }
+    await deleteUserData(ME, u.username);
+    if (isAdminId(ME)) await A.signOut(AUTH);
     closeSheet(); toast('Account and face data deleted.');
     forgetAccount(ME); setMe(accounts()[0] || null); start();
   } catch (e){ console.warn(e); toast("Couldn't delete everything. Try again."); }
   busy();
+}
+async function deleteUserData(id, username){
+  const q = (c, f, op, v) => F.getDocs(F.query(col(c), F.where(f, op, v)));
+  const [ds, ns, ps, gs, es] = await Promise.all([q('deliveries', 'userId', '==', id), q('notifications', 'userId', '==', id), q('photos', 'matched', 'array-contains', id), q('groups', 'members', 'array-contains', id), q('events', 'members', 'array-contains', id)]);
+  const ops = [];
+  ds.docs.forEach(d => ops.push(b => b.delete(d.ref))); ns.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+  ps.docs.forEach(d => ops.push(b => b.update(d.ref, {faces:d.data().faces.map(f => f.matchId === id ? {...f, matchId:null} : f), matched:F.arrayRemove(id)})));
+  gs.docs.concat(es.docs).forEach(d => ops.push(b => b.update(d.ref, {members:F.arrayRemove(id)})));
+  if (username) ops.push(b => b.delete(ref('usernames', username)));
+  ops.push(b => b.delete(ref('users', id)));
+  await commitOps(ops);
 }
 
 /* ---------- screens ---------- */
@@ -1029,6 +1145,7 @@ function screenProfile(){
     <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
     <div class="content"><div class="stats"><div><b>${photosOfMe}</b><span>Photos Of Me</span></div><div><b>${ups}</b><span>Uploads</span></div><div><b>${Object.keys(C.groups).length}</b><span>Groups</span></div></div>
     <div style="height:24px"></div>
+    ${isAdminNow() ? `<div class="list"><button class="cell tap" onclick="ADM=null;go({name:'admin',seg:'overview'})"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px;background:var(--accent);color:#fff">A</span><div class="main">Admin Panel</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
     <div class="list"><button class="cell tap" onclick="editProfileSheet()"><div class="main">Edit Profile</div><span class="chev">›</span></button>
       <button class="cell tap" onclick="faceSheet()"><div class="main">Face Match Selfie</div><span class="val">${u.descriptor ? 'On' : 'Not Set'}</span><span class="chev">›</span></button>
       <button class="cell tap" onclick="${perm === 'granted' ? "toast('Notifications are on. Turn them off in your phone\\'s Settings.')" : 'enableNotifications()'}"><div class="main">Notifications</div><span class="val">${perm === 'granted' ? 'On' : 'Off'}</span><span class="chev">›</span></button></div>
@@ -1043,14 +1160,18 @@ function screenProfile(){
 function render(){
   if (!F) return;
   if (!ME){ if (!$('#signup')) renderSignup(); return; }
+  if (isAdminId(ME) && !adminAuthed()){ $('#app').innerHTML = adminGate(); return; }
   if (!me()){ $('#app').innerHTML = '<div class="loading">Loading…</div>'; return; }
   let html = null;
   if (view.name === 'tab') html = ({inbox:screenInbox, photos:screenPhotos, groups:screenGroups, profile:screenProfile}[view.tab] || screenGroups)();
   else if (view.name === 'group') html = screenGroup();
   else if (view.name === 'event') html = screenEvent();
   else if (view.name === 'alerts') html = screenAlerts();
+  else if (view.name === 'admin') html = screenAdmin();
   if (html == null){ if (dyn.photos && Date.now() - (view.at || 0) > 5000){ stack = []; view = {name:'tab', tab:'groups'}; html = screenGroups(); } else html = '<div class="loading">Loading…</div>'; }
-  $('#app').innerHTML = html + tabbar();
+  const ret = localStorage.getItem('inframe_admin_return');
+  const asBar = ret && ret !== ME && adminAuthed() ? `<div class="asbar">Viewing as ${esc(handle(ME))}<button onclick="backToAdmin()">Back To Admin</button></div>` : '';
+  $('#app').innerHTML = html + asBar + tabbar();
   if (document.querySelector('#viewer.show')) drawViewer();
 }
 
@@ -1062,7 +1183,8 @@ function start(){ stopAll(); stack = []; view = {name:'tab', tab:'groups'}; if (
   try { await initFirebase(); } catch (e){ $('#app').innerHTML = '<div class="empty" style="padding-top:30vh"><b>Can\'t Connect</b>Check your internet connection and reopen InFrame.</div>'; return; }
   const p = new URLSearchParams(location.search);
   if (p.get('join')) sessionStorage.setItem('inframe_join', p.get('join'));
-  if (p.get('login')){ const s = await F.getDoc(ref('users', p.get('login'))); if (s.exists()){ setMe(s.id); toast(`Signed in as @${s.data().username}.`); } else toast("That sign-in link isn't valid."); }
+  if (p.get('login') && isAdminId(p.get('login'))) toast('The admin account can only sign in with Google.');
+  else if (p.get('login')){ const s = await F.getDoc(ref('users', p.get('login'))); if (s.exists()){ setMe(s.id); toast(`Signed in as @${s.data().username}.`); } else toast("That sign-in link isn't valid."); }
   if (p.toString()) history.replaceState(null, '', location.pathname);
   if (ME){ try { const s = await F.getDoc(ref('users', ME)); if (!s.exists()){ forgetAccount(ME); setMe(accounts()[0] || null); } } catch {} }
   start();
