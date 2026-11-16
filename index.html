@@ -180,7 +180,10 @@ button{cursor:pointer}
 #cam .cancel{position:absolute;left:20px;bottom:calc(var(--sab) + 34px);border:0;background:none;color:#fff;font-size:17px}
 /* banners & toasts */
 #banner{position:fixed;left:8px;right:8px;top:calc(var(--sat) + 8px);z-index:60;max-width:440px;margin:0 auto;background:var(--bar);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:18px;padding:12px 14px;display:flex;gap:11px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.18);transform:translateY(-140%);transition:transform .4s cubic-bezier(.2,.9,.25,1);cursor:pointer}
+#banner:not(.show){box-shadow:none;visibility:hidden;transition:transform .4s cubic-bezier(.2,.9,.25,1),visibility 0s .4s}
 #banner.show{transform:none}
+.sq.big{margin:0 auto}
+@media (min-width:900px){.nav{background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}}
 #banner img{width:38px;height:38px;border-radius:9px}
 #banner .bt{font-size:15px;font-weight:600;display:flex;justify-content:space-between}
 #banner .bt small{color:var(--muted);font-weight:400;font-size:13px}
@@ -424,9 +427,9 @@ async function admDeleteThing(kind, id){
     const eids = kind === 'group' ? (await F.getDocs(F.query(col('events'), F.where('groupId', '==', id)))).docs.map(d => d.id) : [id], ops = [];
     for (let i = 0; i < eids.length; i += 30){
       const chunk = eids.slice(i, i + 30);
-      const [ps, ds] = await Promise.all([F.getDocs(F.query(col('photos'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('deliveries'), F.where('eventId', 'in', chunk)))]);
+      const [ps, ds, rs] = await Promise.all([F.getDocs(F.query(col('photos'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('deliveries'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('requests'), F.where('eventId', 'in', chunk)))]);
       ps.docs.forEach(d => { ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); });
-      ds.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+      ds.docs.concat(rs.docs).forEach(d => ops.push(b => b.delete(d.ref)));
     }
     eids.forEach(e => ops.push(b => b.delete(ref('events', e))));
     if (kind === 'group') ops.push(b => b.delete(ref('groups', id)));
@@ -443,7 +446,7 @@ async function admDeleteUser(id){
 }
 
 /* ---------- synced data ---------- */
-const C = { users:{}, groups:{}, sEvents:{}, gEvents:{}, photos:{}, extra:{}, extraEvents:{}, deliveries:{}, notifs:[] };
+const C = { users:{}, groups:{}, sEvents:{}, gEvents:{}, photos:{}, extra:{}, extraEvents:{}, deliveries:{}, notifs:[], reqIn:{}, reqOut:{} };
 const BOOT_AT = Date.now();
 let subs = {}, userSubs = {}, dyn = {}, notifLoaded = false;
 const toMap = snap => Object.fromEntries(snap.docs.map(d => [d.id, {id:d.id, ...d.data()}]));
@@ -453,7 +456,7 @@ function stopAll(){
   Object.values(subs).forEach(u => u()); Object.values(userSubs).forEach(u => u());
   Object.values(dyn).forEach(d => d.unsubs.forEach(u => u()));
   subs = {}; userSubs = {}; dyn = {}; notifLoaded = false;
-  Object.assign(C, {users:{}, groups:{}, sEvents:{}, gEvents:{}, photos:{}, extra:{}, extraEvents:{}, deliveries:{}, notifs:[]});
+  Object.assign(C, {users:{}, groups:{}, sEvents:{}, gEvents:{}, photos:{}, extra:{}, extraEvents:{}, deliveries:{}, notifs:[], reqIn:{}, reqOut:{}});
 }
 // Live "where field in [...]" listener that re-subscribes only when the list changes (Firestore allows 30 per query).
 function subIn(name, coll, field, values, onDocs){
@@ -486,6 +489,8 @@ function subscribeAll(){
     C.deliveries = {}; s.docs.forEach(d => { C.deliveries[d.data().photoId] = {id:d.id, ...d.data()}; });
     fetchExtras(); badge(); later();
   });
+  listen('reqIn', F.query(col('requests'), F.where('toId', '==', ME)), s => { C.reqIn = toMap(s); watchUsers(Object.values(C.reqIn).map(r => r.fromId)); badge(); later(); });
+  listen('reqOut', F.query(col('requests'), F.where('fromId', '==', ME)), s => { C.reqOut = toMap(s); later(); });
   listen('notifs', F.query(col('notifications'), F.where('userId', '==', ME)), s => {
     if (notifLoaded) s.docChanges().forEach(ch => { if (ch.type === 'added'){ const n = {id:ch.doc.id, ...ch.doc.data()}; if (n.at > BOOT_AT) incoming(n); } });
     notifLoaded = true;
@@ -533,6 +538,7 @@ function eventMembers(e){ if (!e) return []; if (e.groupId){ const g = C.groups[
 const myDel = pid => C.deliveries[pid];
 const pending = () => Object.values(C.deliveries).filter(d => d.status === 'pending' && photo(d.photoId) && !photo(d.photoId).loading);
 const unreadCount = () => C.notifs.filter(n => !n.read).length;
+const openReqsIn = () => Object.values(C.reqIn).filter(r => r.status === 'open' && evt(r.eventId)).sort((a, b) => b.at - a.at);
 const isUncat = p => !p.faces?.length || p.faces.some(f => !f.matchId);
 const uncatFor = eid => Object.values(C.photos).filter(p => p.eventId === eid && isUncat(p) && !myDel(p.id)).sort((a, b) => b.createdAt - a.createdAt);
 function avatar(u, size = 36, withEmoji){
@@ -563,7 +569,7 @@ function incoming(n){
 }
 function bannerTap(){ $('#banner').classList.remove('show'); openLink(bannerLink); }
 function openLink(l){ if (!l) return go({name:'alerts'}); if (l.v === 'inbox') tab('inbox'); else if (l.v === 'event' && evt(l.id)) go({name:'event', id:l.id, seg:l.seg || 'mine'}); else if (l.v === 'group' && C.groups[l.id]) go({name:'group', id:l.id}); else if (l.v === 'photo' && photo(l.id)) openViewer(l.id, [l.id]); else go({name:'alerts'}); }
-function badge(){ const n = pending().length + unreadCount(); try { n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.(); } catch {} }
+function badge(){ const n = pending().length + openReqsIn().length + unreadCount(); try { n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.(); } catch {} }
 async function enableNotifications(){
   if (!('Notification' in window)){
     return toast(isIOS && !standalone ? 'Add InFrame to your Home Screen first, then turn on notifications.' : "This browser doesn't support notifications.");
@@ -903,6 +909,12 @@ async function upload(eid, list){
     } catch (err){ console.warn(err); failed++; }
   }
   busy();
+  // Uploading to an event answers any photo requests you had for it.
+  const answered = Object.values(C.reqIn).filter(r => r.eventId === eid && r.status === 'open');
+  if (done && answered.length){
+    const b = F.writeBatch(db); answered.forEach(r => b.update(ref('requests', r.id), {status:'done', doneAt:Date.now(), count:done})); await b.commit();
+    answered.forEach(r => notify([r.fromId], `${handle(ME)} uploaded ${plural(done, 'photo')} from ${e.name} like you asked`, {v:'event', id:eid, seg:'mine'}));
+  }
   for (const [u, n] of Object.entries(perUser)) notify([u], `${handle(ME)} added ${plural(n, 'photo')} of you from ${e.name}`, {v:'inbox'});
   if (uncat) notify(eventMembers(e), `${plural(uncat, 'new photo')} in ${e.name} need${uncat === 1 ? 's' : ''} someone to claim ${uncat === 1 ? 'it' : 'them'}`, {v:'event', id:eid, seg:'uncat'});
   const sent = Object.values(perUser).reduce((a, b) => a + b, 0);
@@ -934,6 +946,37 @@ async function rescanForMe(eids){
     } catch (e){ console.warn(e); }
   }
   busy(); if (found) toast(`Found you in ${plural(found, 'earlier photo')}. Check your Inbox.`);
+}
+
+/* ---------- photo requests ---------- */
+const waitingOn = eid => Object.values(C.reqOut).filter(r => r.eventId === eid && r.status === 'open').map(r => r.toId);
+function requestSheet(eid){
+  const e = evt(eid), others = eventMembers(e).filter(id => id !== ME), waiting = waitingOn(eid);
+  if (!others.length) return toast('Invite friends to this event first.');
+  const box = 'style="width:22px;height:22px;flex:none;accent-color:var(--accent)"';
+  openSheet(`${sheetHead('Request Photos', 'Send', `sendRequests('${eid}')`)}
+    <p class="hint">Ask friends to upload their photos from ${esc(e.name)}. They'll get a notification.</p>
+    <div class="list" style="--inset:52px">
+      <label class="cell tap"><input type="checkbox" ${box} onchange="document.querySelectorAll('.rq').forEach(c=>c.checked=this.checked)"><div class="main"><div class="t">Everyone</div></div></label>
+      ${others.map(id => { const u = user(id); return `<label class="cell tap"><input type="checkbox" class="rq" value="${id}" ${box}>${avatar(u, 36)}<div class="main"><div class="t">${esc(fullName(u))}</div><div class="s">@${esc(u?.username || '')}${waiting.includes(id) ? ' · already asked' : ''}</div></div></label>`; }).join('')}
+    </div>
+    <div class="field" style="margin-top:12px"><label><span>Note</span><input id="rq-note" maxlength="120" placeholder="Optional, like the sunset ones!"></label></div>`);
+}
+async function sendRequests(eid){
+  const ids = [...document.querySelectorAll('.rq:checked')].map(c => c.value);
+  if (!ids.length) return toast('Pick at least one person.');
+  const e = evt(eid), note = $('#rq-note').value.trim(), b = F.writeBatch(db), now = Date.now();
+  ids.forEach(id => b.set(ref('requests', `${eid}_${ME}_${id}`), {eventId:eid, fromId:ME, toId:id, note, status:'open', at:now}));
+  await b.commit();
+  notify(ids, `${handle(ME)} asked for your photos from ${e.name}${note ? `: "${note}"` : ''}`, {v:'inbox'});
+  closeSheet(); toast(`Request sent to ${plural(ids.length, 'person', 'people')}.`);
+}
+async function dismissRequest(id){ await F.updateDoc(ref('requests', id), {status:'dismissed'}); toast('Request dismissed.'); }
+function requestCard(r){
+  const e = evt(r.eventId);
+  return `<div class="card inbox">${avatar(user(r.fromId), 48, true)}<div class="main"><div class="t">${esc(handle(r.fromId))} wants your photos</div><div class="s">From ${esc(e?.name || 'an event')} · ${ago(r.at)}</div>
+    ${r.note ? `<div style="font-size:15px;margin-top:4px">“${esc(r.note)}”</div>` : ''}
+    <div class="row" style="margin-top:8px"><label class="btn sm fill">Upload Photos<input type="file" accept="image/*" multiple hidden onchange="upload('${r.eventId}',this.files)"></label><button class="btn sm tint" onclick="dismissRequest('${r.id}')">Dismiss</button></div></div></div>`;
 }
 
 /* ---------- approving & reacting ---------- */
@@ -1090,9 +1133,9 @@ async function deleteAccount(){
 }
 async function deleteUserData(id, username){
   const q = (c, f, op, v) => F.getDocs(F.query(col(c), F.where(f, op, v)));
-  const [ds, ns, ps, gs, es] = await Promise.all([q('deliveries', 'userId', '==', id), q('notifications', 'userId', '==', id), q('photos', 'matched', 'array-contains', id), q('groups', 'members', 'array-contains', id), q('events', 'members', 'array-contains', id)]);
+  const [ds, ns, ps, gs, es, r1, r2] = await Promise.all([q('deliveries', 'userId', '==', id), q('notifications', 'userId', '==', id), q('photos', 'matched', 'array-contains', id), q('groups', 'members', 'array-contains', id), q('events', 'members', 'array-contains', id), q('requests', 'toId', '==', id), q('requests', 'fromId', '==', id)]);
   const ops = [];
-  ds.docs.forEach(d => ops.push(b => b.delete(d.ref))); ns.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+  ds.docs.concat(ns.docs, r1.docs, r2.docs).forEach(d => ops.push(b => b.delete(d.ref)));
   ps.docs.forEach(d => ops.push(b => b.update(d.ref, {faces:d.data().faces.map(f => f.matchId === id ? {...f, matchId:null} : f), matched:F.arrayRemove(id)})));
   gs.docs.concat(es.docs).forEach(d => ops.push(b => b.update(d.ref, {members:F.arrayRemove(id)})));
   if (username) ops.push(b => b.delete(ref('usernames', username)));
@@ -1110,7 +1153,7 @@ const ICONS = {
   plus:'<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2.400" stroke-linecap="round"><path d="M14 6v16M6 14h16"/></svg>',
 };
 function tabbar(){
-  const n = pending().length, b = (k, l) => `<button class="${view.name === 'tab' && view.tab === k ? 'on' : ''}" onclick="tab('${k}')">${ICONS[k]}${l}${k === 'inbox' && n ? `<span class="dot">${n}</span>` : ''}</button>`;
+  const n = pending().length + openReqsIn().length, b = (k, l) => `<button class="${view.name === 'tab' && view.tab === k ? 'on' : ''}" onclick="tab('${k}')">${ICONS[k]}${l}${k === 'inbox' && n ? `<span class="dot">${n}</span>` : ''}</button>`;
   return `<nav class="tabbar"><div class="sbrand"><img src="icon-192.png" alt="">InFrame</div>${b('inbox', 'Inbox')}${b('photos', 'Photos')}${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
 }
 function bell(){ const n = unreadCount(); return `<button class="iconbtn" onclick="go({name:'alerts'})" aria-label="Notifications">${ICONS.bell}${n ? `<span class="dot">${n}</span>` : ''}</button>`; }
@@ -1132,6 +1175,7 @@ function screenInbox(){
   const items = pending().map(d => photo(d.photoId)).sort((a, b) => b.createdAt - a.createdAt), ids = items.map(p => p.id);
   return `<div class="nav"><span class="spacer"></span>${bell()}</div><div class="large"><h1>Inbox</h1>${items.length > 1 ? `<button class="btn sm tint" onclick="keepAll()">Keep All</button>` : ''}</div>
     <div class="content"><p class="hint">Photos your friends took that you're in.</p>
+    ${openReqsIn().length ? `<div class="sechead" style="margin:4px 0 7px">Photo Requests</div>${openReqsIn().map(requestCard).join('')}<div class="sechead" style="margin:20px 0 7px">Photos Of You</div>` : ''}
     ${items.map(p => `<div class="card inbox"><button class="th" onclick="openViewer('${p.id}',${esc(JSON.stringify(ids))})"><img src="${p.thumb}" alt=""></button>
       <div class="main"><div class="t">${esc(evt(p.eventId)?.name || 'Event')}</div><div class="s">From ${esc(handle(p.uploaderId))} · ${ago(p.createdAt)}</div>
       <div class="row" style="margin-top:8px"><button class="btn sm green" onclick="decide('${p.id}','keep')">Keep</button><button class="btn sm tint" onclick="decide('${p.id}','skip')">Skip</button><button class="btn sm tint" onclick="decide('${p.id}','notme')">Not Me</button></div></div></div>`).join('')
@@ -1185,7 +1229,11 @@ function screenEvent(){
   return `${topBar(e.name, `<button class="iconbtn" onclick="inviteSheet('${g ? 'group' : 'event'}','${g ? g.id : e.id}')" aria-label="Invite" style="font-size:17px">Invite</button>`)}
     <div class="hero">${sq(e, true)}<h1>${esc(e.name)}</h1><div class="s">${fmtDate(e.date)} · ${g ? esc(g.name) : 'Single Event'}</div></div>
     ${membersRow(eventMembers(e))}
-    <div class="content"><label class="btn fill full" style="margin-top:12px">Upload Photos<input type="file" accept="image/*" multiple hidden onchange="upload('${e.id}',this.files)"></label>
+    <div class="content">
+    ${openReqsIn().filter(r => r.eventId === e.id).map(r => `<div class="callout" style="margin-top:12px"><div style="flex:1"><b>${esc(handle(r.fromId))}</b> asked for your photos from this event${r.note ? `: “${esc(r.note)}”` : '.'}</div></div>`).join('')}
+    <div class="row" style="margin-top:12px;flex-wrap:nowrap"><label class="btn fill" style="flex:1;padding:15px;border-radius:14px">Upload Photos<input type="file" accept="image/*" multiple hidden onchange="upload('${e.id}',this.files)"></label>
+      <button class="btn tint" style="flex:1;padding:15px;border-radius:14px" onclick="requestSheet('${e.id}')">Request Photos</button></div>
+    ${waitingOn(e.id).length ? `<div class="fnote" style="margin:8px 4px 0">Waiting on ${waitingOn(e.id).map(id => esc(handle(id))).join(', ')} to upload.</div>` : ''}
     ${me()?.descriptor ? '' : `<div class="callout" style="margin-top:12px"><div style="flex:1">You don't have a face selfie yet, so photos of you won't be found automatically. <a href="#" onclick="faceSheet();return false" style="color:var(--accent)">Add Selfie</a></div></div>`}
     <div class="seg">${sb('mine', 'Of Me', mine.length)}${sb('uncat', 'Uncategorized', uncat.length)}${sb('uploads', 'My Uploads', ups.length)}</div>
     ${list.length ? `<div class="grid">${list.map(p => tileHTML(p, ids, tag(p))).join('')}</div>` : `<div class="empty">${empty}</div>`}
