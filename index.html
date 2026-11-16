@@ -218,7 +218,14 @@ button{cursor:pointer}
    InFrame — friends share event photos; face matching delivers each
    photo to the people in it. Data syncs through Firebase Firestore.
    ================================================================= */
-const FB_CONFIG = null; // set after the InFrame Firebase project is created
+const FB_CONFIG = {
+  apiKey:'AIzaSyCYQssu__C8kf7JpJZIwWXCB9mGRp9UDnY',
+  authDomain:'inframe-bc59d.firebaseapp.com',
+  projectId:'inframe-bc59d',
+  storageBucket:'inframe-bc59d.firebasestorage.app',
+  messagingSenderId:'26746903577',
+  appId:'1:26746903577:web:ad6e686534a1a3d72c5e88',
+};
 const TERMS_VERSION = '2026-11-15';
 const MATCH = 0.55; // face distance cut-off; lower = stricter
 const FACEAPI = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/';
