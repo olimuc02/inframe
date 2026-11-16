@@ -11,10 +11,11 @@
 <meta name="description" content="Share event photos with friends. Everyone gets the photos they're in.">
 <meta name="theme-color" content="#F3EFE7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#11100E" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="tab-icon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="tab-icon-32.png?v=2" sizes="32x32" type="image/png">
+<link rel="shortcut icon" href="tab-icon.ico?v=2">
 <title>InFrame</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -571,42 +572,42 @@ function renderAuth(){
       <div>
         <div class="lp-kicker"><i></i>For trips, parties &amp; nights out</div>
         <h1>Every photo, to <em>everyone</em> in it.</h1>
-        <p class="lp-lead">Everyone drops in their pics after the event. InFrame spots who's in each one and sends it straight to them. Nobody has to ask twice.</p>
+        <p class="lp-lead">Everyone uploads. InFrame finds who's in each photo and sends it to them.</p>
         ${invited}
         <div class="lp-ctas"><button class="btn fill" onclick="showAuth('signup')">Get Started</button><button class="btn line" onclick="showAuth('login')">Log In</button></div>
-        <p class="lp-note">Works on iPhone, Android and laptop. Nothing to download.</p>
+        <p class="lp-note">iPhone, Android or laptop. Nothing to download.</p>
       </div>
       <div class="lp-art">${heroArt()}</div>
     </section>
     <div class="lp-band"><section class="lp-sec lp-chat">
       <div class="chat"><div class="who">Nina</div><div class="bub">omg send me the pics from saturday</div><div class="who">Theo</div><div class="bub">wait who has the sunset ones??</div>
         <div class="bub me">i'll send them tonight</div><div class="bub read">Read 3 weeks ago</div><div class="who">Nina</div><div class="bub">still waiting 😭</div></div>
-      <div><h2>Sound familiar?</h2><p class="lp-p">The best photos of you always end up on someone else's phone. InFrame gets them to you without the chasing, and without dumping 400 pictures into the group chat.</p></div>
+      <div><h2>Sound familiar?</h2><p class="lp-p">Your best photos are always on someone else's phone. InFrame gets them to you, no chasing.</p></div>
     </section></div>
     <section class="lp-sec lp-how"><h2>How it works</h2>
       <ol class="lp-steps">
-        <li><span class="n">01</span><h3>Start a group</h3><p>Make one for your crew, or a single event like a wedding or a trip. Friends join with a link.</p></li>
-        <li><span class="n">02</span><h3>Everyone uploads</h3><p>After the night, each person adds the photos from their phone. All at once, no sorting.</p></li>
-        <li><span class="n">03</span><h3>You get yours</h3><p>InFrame recognizes everyone from their sign-up selfie and drops each photo in the right person's inbox.</p></li>
+        <li><span class="n">01</span><h3>Start a group</h3><p>For your crew or a one-off trip. Friends join with a link.</p></li>
+        <li><span class="n">02</span><h3>Everyone uploads</h3><p>Everyone adds their photos after the event.</p></li>
+        <li><span class="n">03</span><h3>You get yours</h3><p>Each photo goes straight to the people in it.</p></li>
       </ol>
       <div class="lp-feats">
-        ${[['You approve everything', 'Photos land in your inbox first. Keep the good ones, skip the rest.'],
-           ['Ask for the missing ones', 'Tap Request Photos and friends get a nudge to upload theirs.'],
-           ['Nobody gets left out', "Photos it can't match go to an Uncategorized pile anyone can claim from."],
-           ['React, save, done', "Drop a 🔥 on a friend's shot and save it straight to your camera roll."]]
+        ${[['You approve first', 'Keep or skip every photo.'],
+           ['Request photos', "Nudge friends who haven't shared."],
+           ['Nothing gets lost', 'Unmatched photos go to a shared pile.'],
+           ['Save in one tap', 'Straight to your camera roll.']]
           .map(([t, d]) => `<div class="lp-feat"><span class="k"></span><div><b>${t}</b><p>${d}</p></div></div>`).join('')}
       </div>
     </section>
     <div class="lp-dark"><section class="lp-sec lp-priv">
-      <div><h2>Your face stays yours.</h2><p class="lp-p">Face matching only works inside the groups you join. Nowhere else.</p></div>
+      <div><h2>Your face stays yours.</h2></div>
       <ul>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Your selfie is only used to find you in your own groups' photos.</li>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>People who aren't members are never identified or saved.</li>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Never sold, never used for ads, never used to train AI.</li>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg><span>Delete your face data anytime with one tap. <a href="terms.html#biometric" target="_blank">Read the policy</a></span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Only used inside your own groups.</li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Non-members are never identified.</li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Never sold or used for ads.</li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg><span>Delete it anytime. <a href="terms.html#biometric" target="_blank">Policy</a></span></li>
       </ul>
     </section></div>
-    <section class="lp-sec lp-final"><h2>Your best photos are on someone else's phone.</h2><button class="btn fill" style="padding:17px 32px;font-size:18px" onclick="showAuth('signup')">Get Started</button></section>
+    <section class="lp-sec lp-final"><h2>Stop chasing photos.</h2><button class="btn fill" style="padding:17px 32px;font-size:18px" onclick="showAuth('signup')">Get Started</button></section>
     <footer class="lp-foot"><span>© 2026 InFrame</span><a href="terms.html" target="_blank">Terms &amp; Privacy</a></footer>
     <div class="lp-sticky"><button class="btn line" onclick="showAuth('login')">Log In</button><button class="btn fill" onclick="showAuth('signup')">Get Started</button></div>
   </div>`;
