@@ -355,6 +355,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .lp-foot{max-width:1180px;margin:0 auto;padding:22px;display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:13px;border-top:1px solid var(--sep)}
 .lp-foot a{color:var(--muted)}
 #app:has(> .lp){max-width:none;padding-bottom:0}
+.lp{text-transform:lowercase} /* the whole landing page is lowercase by design */
 .lp-sticky{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;transform:translateY(110%);transition:transform .3s cubic-bezier(.2,.9,.25,1);gap:8px;padding:10px 14px calc(var(--sab) + 10px);background:var(--bar);backdrop-filter:saturate(160%) blur(18px);-webkit-backdrop-filter:saturate(160%) blur(18px);border-top:1px solid var(--sep)}
 .lp-sticky .btn{flex:1;padding:15px}
 .lp-sticky.on{transform:none}
