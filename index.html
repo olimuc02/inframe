@@ -361,6 +361,28 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 @media (min-width:900px){.lp-sticky{display:none}}
 @media (max-width:899px){.lp-nav .btn{display:none}}
 
+
+/* landing, human pass: plain type, marker underline, sentences instead of cards */
+.lp-hero h1{font-size:clamp(44px,10.5vw,76px);line-height:1;letter-spacing:-.03em;font-weight:700}
+.mark{position:relative;white-space:nowrap;display:inline-block}
+.mark svg{position:absolute;left:-3%;bottom:-.12em;width:106%;height:.32em;overflow:visible}
+.mark path{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.mark path.thin{stroke-width:3.5;opacity:.8}
+.lp-lead{font-size:20px;max-width:440px}
+.lp-ctas{align-items:center;gap:18px}
+.lp-textbtn{border:0;background:none;color:var(--ink2);font-size:17px;font-weight:550;padding:6px 2px;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--sep)}
+.lp h2{font-size:clamp(30px,5vw,46px);letter-spacing:-.03em;font-weight:700;line-height:1.05}
+.lp-small{font-size:14px;font-weight:600;color:var(--muted);margin:0 0 14px}
+.lp-flow{padding-top:64px;padding-bottom:40px}
+.lp-flow ol{list-style:none;margin:0;padding:0;counter-reset:f}
+.lp-flow li{counter-increment:f;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 14px;padding:18px 0;border-top:1px solid var(--sep);font-family:var(--display);font-size:clamp(26px,4.4vw,44px);letter-spacing:-.025em;line-height:1.15}
+.lp-flow li:last-child{border-bottom:1px solid var(--sep)}
+.lp-flow li::before{content:counter(f);font:600 15px -apple-system,system-ui,sans-serif;color:var(--accent);align-self:center;width:22px}
+.lp-flow b{font-weight:700}
+.lp-flow span{color:var(--muted);font-weight:500}
+.lp-about{padding-top:36px;padding-bottom:64px;max-width:1180px}
+.lp-about p:last-child{font-size:18px;line-height:1.55;color:var(--ink2);max-width:640px;margin:0}
+@media (min-width:900px){.lp-flow{padding-top:110px}.lp-about{padding-bottom:110px}.lp-hero{padding-top:72px}}
 .asbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 70px);z-index:11;background:var(--accent);color:#fff;font-size:14px;font-weight:650;padding:7px 8px 7px 16px;border-radius:99px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap}
 .asbar button{border:0;background:rgba(255,255,255,.25);color:#fff;font-weight:700;font-size:13px;padding:5px 11px;border-radius:99px}
 </style>
@@ -567,49 +589,35 @@ function renderAuth(){
     <button class="btn fill full" onclick="doReset()">Send Reset Link</button></div>`;
   else html = `<div class="lp" id="auth">
     <div class="lp-navw"><nav class="lp-nav"><a class="lp-brand" href="./"><img src="icon-192.png" alt="">InFrame</a><span class="spacer"></span>
-      <button class="lp-login" onclick="showAuth('login')">Log In</button><button class="btn fill" onclick="showAuth('signup')">Get Started</button></nav></div>
+      <button class="lp-login" onclick="showAuth('login')">Log In</button><button class="btn fill" onclick="showAuth('signup')">Start A Group</button></nav></div>
     <section class="lp-sec lp-hero">
       <div>
-        <div class="lp-kicker"><i></i>For trips, parties &amp; nights out</div>
-        <h1>Every photo, to <em>everyone</em> in it.</h1>
-        <p class="lp-lead">Everyone uploads. InFrame finds who's in each photo and sends it to them.</p>
+        <h1>Every photo, to <span class="mark">everyone<svg viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M4 15C78 6 170 4 296 10"/><path d="M26 21C118 14 206 13 282 17" class="thin"/></svg></span> in it.</h1>
+        <p class="lp-lead">Everyone uploads their photos from the night. InFrame sends each one to the people in it.</p>
         ${invited}
-        <div class="lp-ctas"><button class="btn fill" onclick="showAuth('signup')">Get Started</button><button class="btn line" onclick="showAuth('login')">Log In</button></div>
-        <p class="lp-note">iPhone, Android or laptop. Nothing to download.</p>
+        <div class="lp-ctas"><button class="btn fill" onclick="showAuth('signup')">Start A Group</button><button class="lp-textbtn" onclick="showAuth('login')">or log in</button></div>
       </div>
       <div class="lp-art">${heroArt()}</div>
     </section>
     <div class="lp-band"><section class="lp-sec lp-chat">
       <div class="chat"><div class="who">Nina</div><div class="bub">omg send me the pics from saturday</div><div class="who">Theo</div><div class="bub">wait who has the sunset ones??</div>
         <div class="bub me">i'll send them tonight</div><div class="bub read">Read 3 weeks ago</div><div class="who">Nina</div><div class="bub">still waiting 😭</div></div>
-      <div><h2>Sound familiar?</h2><p class="lp-p">Your best photos are always on someone else's phone. InFrame gets them to you, no chasing.</p></div>
+      <div><h2>We've all been in this chat.</h2><p class="lp-p">Your best photos are always on someone else's phone.</p></div>
     </section></div>
-    <section class="lp-sec lp-how"><h2>How it works</h2>
-      <ol class="lp-steps">
-        <li><span class="n">01</span><h3>Start a group</h3><p>For your crew or a one-off trip. Friends join with a link.</p></li>
-        <li><span class="n">02</span><h3>Everyone uploads</h3><p>Everyone adds their photos after the event.</p></li>
-        <li><span class="n">03</span><h3>You get yours</h3><p>Each photo goes straight to the people in it.</p></li>
+    <section class="lp-sec lp-flow">
+      <p class="lp-small">how it works</p>
+      <ol>
+        <li><b>Make a group</b><span>and text your friends the link.</span></li>
+        <li><b>Everyone uploads</b><span>whatever they shot that night.</span></li>
+        <li><b>You get the ones you're in.</b><span>Keep the good ones.</span></li>
       </ol>
-      <div class="lp-feats">
-        ${[['You approve first', 'Keep or skip every photo.'],
-           ['Request photos', "Nudge friends who haven't shared."],
-           ['Nothing gets lost', 'Unmatched photos go to a shared pile.'],
-           ['Save in one tap', 'Straight to your camera roll.']]
-          .map(([t, d]) => `<div class="lp-feat"><span class="k"></span><div><b>${t}</b><p>${d}</p></div></div>`).join('')}
-      </div>
     </section>
-    <div class="lp-dark"><section class="lp-sec lp-priv">
-      <div><h2>Your face stays yours.</h2></div>
-      <ul>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Only used inside your own groups.</li>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Non-members are never identified.</li>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>Never sold or used for ads.</li>
-        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg><span>Delete it anytime. <a href="terms.html#biometric" target="_blank">Policy</a></span></li>
-      </ul>
-    </section></div>
-    <section class="lp-sec lp-final"><h2>Stop chasing photos.</h2><button class="btn fill" style="padding:17px 32px;font-size:18px" onclick="showAuth('signup')">Get Started</button></section>
-    <footer class="lp-foot"><span>© 2026 InFrame</span><a href="terms.html" target="_blank">Terms &amp; Privacy</a></footer>
-    <div class="lp-sticky"><button class="btn line" onclick="showAuth('login')">Log In</button><button class="btn fill" onclick="showAuth('signup')">Get Started</button></div>
+    <section class="lp-sec lp-about">
+      <p class="lp-small">about your face</p>
+      <p>Your sign-up selfie is only used to spot you in photos from your own groups. We don't identify anyone else, we never sell it, and you can delete it whenever you want. <a href="terms.html#biometric" target="_blank">Read the policy</a>.</p>
+    </section>
+    <footer class="lp-foot"><span>© 2026 InFrame</span><span><a href="terms.html" target="_blank">Terms &amp; Privacy</a></span></footer>
+    <div class="lp-sticky"><button class="btn line" onclick="showAuth('login')">Log In</button><button class="btn fill" onclick="showAuth('signup')">Start A Group</button></div>
   </div>`;
   $('#app').innerHTML = html;
   const ctas = document.querySelector('.lp-ctas'), bar = document.querySelector('.lp-sticky');
