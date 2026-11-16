@@ -1,0 +1,22 @@
+rules_version = '2';
+// InFrame prototype rules: only InFrame's own collections are reachable, with basic shape checks.
+// Before a wide public launch, add Firebase Authentication and tie writes to the signed-in user.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /inframe_users/{id} {
+      allow read, delete: if true;
+      allow create, update: if request.resource.data.username is string
+        && request.resource.data.first is string && request.resource.data.first.size() <= 40;
+    }
+    match /inframe_usernames/{name} {
+      allow read, delete: if true;
+      allow create, update: if name.matches('^[a-z0-9._]{3,20}$') && request.resource.data.userId is string;
+    }
+    match /inframe_groups/{id} { allow read, write: if true; }
+    match /inframe_events/{id} { allow read, write: if true; }
+    match /inframe_photos/{id} { allow read, write: if true; }
+    match /inframe_images/{id} { allow read, write: if true; }
+    match /inframe_deliveries/{id} { allow read, write: if true; }
+    match /inframe_notifications/{id} { allow read, write: if true; }
+  }
+}

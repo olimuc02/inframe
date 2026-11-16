@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="InFrame">
+<meta name="application-name" content="InFrame">
+<meta name="description" content="Share event photos with friends. Everyone gets the photos they're in.">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>InFrame</title>
+<style>
+:root{
+  --bg:#f2f2f7; --card:#fff; --card2:#f2f2f7; --ink:#000; --muted:#8a8a8e; --sep:rgba(60,60,67,.18);
+  --accent:#5856d6; --accent-soft:rgba(88,86,214,.12); --green:#34c759; --red:#ff3b30; --orange:#ff9500;
+  --bar:rgba(249,249,249,.86); --sat:env(safe-area-inset-top); --sab:env(safe-area-inset-bottom);
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#000; --card:#1c1c1e; --card2:#2c2c2e; --ink:#fff; --muted:#98989f; --sep:rgba(84,84,88,.6);
+    --accent:#7d7aff; --accent-soft:rgba(125,122,255,.18); --green:#30d158; --red:#ff453a; --orange:#ff9f0a; --bar:rgba(22,22,24,.86); }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+button,input,select,textarea{font:inherit;color:inherit}
+input,textarea,select{font-size:17px}
+button{cursor:pointer}
+#app{max-width:680px;margin:0 auto;min-height:100vh;min-height:100dvh;padding-bottom:calc(84px + var(--sab))}
+.nav{position:sticky;top:0;z-index:10;padding:calc(var(--sat) + 8px) 16px 8px;background:var(--bar);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);display:flex;align-items:center;min-height:44px;border-bottom:.5px solid transparent}
+.nav.line{border-bottom-color:var(--sep)}
+.nav .back{border:0;background:none;color:var(--accent);font-size:17px;padding:4px 0;display:flex;align-items:center;gap:2px}
+.nav .back svg{width:13px;height:21px}
+.nav .ttl{position:absolute;left:50%;transform:translateX(-50%);font-weight:600;font-size:17px;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spacer{flex:1}
+.iconbtn{position:relative;border:0;background:none;color:var(--accent);padding:4px;display:flex}
+.iconbtn svg{width:26px;height:26px}
+.dot{position:absolute;top:0;right:-2px;background:var(--red);color:#fff;font-size:12px;font-weight:600;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.large{display:flex;align-items:flex-end;justify-content:space-between;padding:4px 16px 8px}
+.large h1{font-size:34px;font-weight:700;letter-spacing:.01em;margin:0}
+.content{padding:0 16px 24px}
+.hint{color:var(--muted);font-size:15px;margin:2px 0 16px}
+.sechead{font-size:13px;text-transform:uppercase;color:var(--muted);margin:24px 16px 7px;letter-spacing:.02em;display:flex;justify-content:space-between;align-items:center}
+.sechead button{border:0;background:none;color:var(--accent);font-size:15px;text-transform:none;letter-spacing:0;padding:0}
+.list{background:var(--card);border-radius:12px;overflow:hidden}
+.cell{display:flex;align-items:center;gap:12px;padding:11px 16px;min-height:44px;position:relative;width:100%;border:0;background:none;text-align:left;font-size:17px}
+.cell+.cell::before{content:"";position:absolute;top:0;right:0;left:var(--inset,16px);border-top:.5px solid var(--sep)}
+.cell.tap:active{background:var(--card2)}
+.cell .main{flex:1;min-width:0}
+.cell .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .s{color:var(--muted);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .chev{color:var(--muted);opacity:.6;font-size:22px;line-height:1}
+.cell .val{color:var(--muted)}
+.cell.red{color:var(--red);justify-content:center}
+.cell.blue{color:var(--accent)}
+.sq{width:44px;height:44px;border-radius:11px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;flex:none}
+.sq.big{width:84px;height:84px;border-radius:20px;font-size:44px}
+.av{border-radius:50%;object-fit:cover;flex:none;background:var(--card2);display:inline-flex;align-items:center;justify-content:center;font-weight:600;color:var(--accent);background:var(--accent-soft);overflow:hidden}
+.avw{position:relative;display:inline-flex;flex:none}
+.avw .em{position:absolute;right:-4px;bottom:-4px;background:var(--card);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 .5px var(--sep)}
+.stack{display:flex}.stack>*+*{margin-left:-9px}.stack .av{box-shadow:0 0 0 2px var(--card)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:12px;padding:11px 18px;font-weight:600;font-size:17px;background:var(--card);color:var(--accent);text-decoration:none}
+.btn.fill{background:var(--accent);color:#fff}
+.btn.tint{background:var(--accent-soft);color:var(--accent)}
+.btn.green{background:var(--green);color:#fff}
+.btn.full{width:100%;padding:15px;border-radius:14px}
+.btn.sm{padding:7px 14px;font-size:15px;border-radius:99px}
+.btn:disabled{opacity:.4}
+.btn:active{opacity:.7}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hero{text-align:center;padding:8px 16px 4px}
+.hero h1{font-size:28px;margin:12px 0 2px}
+.hero .s{color:var(--muted);font-size:15px}
+.members{display:flex;gap:14px;overflow-x:auto;padding:14px 16px 4px;scrollbar-width:none}
+.members::-webkit-scrollbar{display:none}
+.member{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--muted);width:58px;flex:none;border:0;background:none;padding:0}
+.member span{max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg{display:flex;background:rgba(118,118,128,.12);border-radius:9px;padding:2px;margin:16px 0 12px}
+.seg button{flex:1;border:0;background:none;padding:6px 4px;border-radius:7px;font-weight:500;font-size:13px}
+.seg button.on{background:var(--card);box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04);font-weight:600}
+@media (prefers-color-scheme:dark){.seg button.on{background:#636366}}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin:0 -16px}
+@media (min-width:560px){.grid{grid-template-columns:repeat(4,1fr);margin:0;gap:4px}.grid .tile{border-radius:6px}}
+.tile{position:relative;aspect-ratio:1;overflow:hidden;background:var(--card2);border:0;padding:0}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .tag{position:absolute;left:5px;bottom:5px;font-size:11px;font-weight:600;background:rgba(0,0,0,.55);color:#fff;padding:2px 7px;border-radius:99px;backdrop-filter:blur(6px)}
+.tile .rx{position:absolute;right:5px;bottom:5px;font-size:13px}
+.empty{text-align:center;color:var(--muted);padding:40px 24px;font-size:15px}
+.empty b{display:block;color:var(--ink);font-size:20px;margin-bottom:6px}
+.card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.inbox{display:flex;gap:12px;align-items:center}
+.inbox .th{width:76px;height:76px;border-radius:10px;overflow:hidden;flex:none;border:0;padding:0;background:var(--card2)}
+.inbox .th img{width:100%;height:100%;object-fit:cover}
+.inbox .main{flex:1;min-width:0}
+.inbox .t{font-weight:600}
+.inbox .s{color:var(--muted);font-size:14px}
+.callout{background:var(--card);border-radius:14px;padding:14px 16px;margin:0 0 14px;display:flex;gap:12px;align-items:flex-start;font-size:15px}
+.callout img{width:44px;height:44px;border-radius:10px}
+.callout .x{border:0;background:none;color:var(--muted);font-size:20px;padding:0 0 0 4px;line-height:1}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;justify-content:center;background:var(--bar);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep);padding:6px 0 calc(var(--sab) + 4px)}
+.tabbar button{position:relative;flex:0 1 120px;border:0;background:none;color:var(--muted);font-size:10px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:1px;padding:2px 0}
+.tabbar button.on{color:var(--accent)}
+.tabbar svg{width:27px;height:27px}
+.tabbar .dot{top:-2px;right:calc(50% - 22px)}
+/* signup */
+.onb{max-width:440px;margin:0 auto;padding:calc(var(--sat) + 28px) 20px calc(var(--sab) + 28px);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.onb .logo{width:76px;height:76px;border-radius:18px;margin:6px auto 14px;display:block;box-shadow:0 6px 20px rgba(88,86,214,.3)}
+.onb h1{font-size:30px;text-align:center;margin:0 0 6px}
+.onb .hint{text-align:center}
+.steps{display:flex;gap:6px;justify-content:center;margin:0 0 18px}
+.steps i{width:28px;height:4px;border-radius:2px;background:var(--sep)}
+.steps i.on{background:var(--accent)}
+.field{background:var(--card);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.field label{display:flex;align-items:center;padding:0 16px;min-height:48px;gap:10px}
+.field label+label{border-top:.5px solid var(--sep)}
+.field label span{width:110px;flex:none;color:var(--ink)}
+.field input,.field textarea{flex:1;border:0;background:none;padding:12px 0;outline:none;min-width:0}
+.field textarea{resize:none;height:66px}
+.field .at{color:var(--muted);margin-right:-8px}
+.fnote{font-size:13px;color:var(--muted);margin:-4px 16px 14px}
+.box{background:var(--card);border-radius:14px;padding:20px;text-align:center;margin-bottom:14px}
+.facecirc{width:128px;height:128px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 10px}
+.okmsg{color:var(--green);font-weight:600;margin-bottom:10px}
+.err{color:var(--red);font-size:14px;margin-top:10px}
+.check{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--muted);margin:4px 4px 14px;cursor:pointer}
+.check input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--accent)}
+.check a{color:var(--accent)}
+.onb .grow{flex:1}
+.link{border:0;background:none;color:var(--accent);font-size:15px;padding:10px;display:block;margin:4px auto 0}
+.emojis{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:10px;background:var(--card);border-radius:12px;margin-bottom:12px}
+.emojis button{border:0;background:none;font-size:26px;aspect-ratio:1;border-radius:10px;padding:0;line-height:1}
+.emojis button.on{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.avpick{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:16px}
+.avpick img{width:110px;height:110px;border-radius:50%;object-fit:cover}
+/* sheets */
+.dim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.4);opacity:0;transition:opacity .25s;display:flex;align-items:flex-end;justify-content:center}
+.dim.show{opacity:1}
+.sheet{background:var(--bg);width:100%;max-width:600px;max-height:calc(100dvh - var(--sat) - 12px);overflow:auto;border-radius:14px 14px 0 0;padding:0 16px calc(var(--sab) + 20px);transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.9,.25,1)}
+.dim.show .sheet{transform:none}
+@media (min-width:700px){.dim{align-items:center}.sheet{border-radius:14px;max-height:88vh}}
+.grab{width:36px;height:5px;border-radius:3px;background:var(--sep);margin:6px auto 0}
+.shh{display:flex;align-items:center;justify-content:space-between;padding:10px 0 14px;position:sticky;top:0;background:var(--bg);z-index:2}
+.shh .ttl{font-weight:600}
+.shh button{border:0;background:none;color:var(--accent);font-size:17px;padding:4px 0;min-width:60px;text-align:left}
+.shh button.done{font-weight:600;text-align:right}
+/* viewer */
+#viewer{position:fixed;inset:0;z-index:40;background:#000;color:#fff;display:none;flex-direction:column}
+#viewer.show{display:flex}
+.vtop{display:flex;align-items:center;padding:calc(var(--sat) + 8px) 12px 8px;gap:10px}
+.vtop button{border:0;background:rgba(255,255,255,.14);color:#fff;width:34px;height:34px;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center}
+.vtop .vt{flex:1;text-align:center;font-size:15px;font-weight:600}
+.vtop .vs{font-weight:400;color:#aaa;font-size:13px}
+.vimg{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y}
+.vwrap{position:relative;display:inline-block;line-height:0}
+.vwrap img{max-width:100vw;max-height:calc(100dvh - var(--sat) - var(--sab) - 210px);display:block}
+.fbox{position:absolute;border:2px solid rgba(52,199,89,.95);border-radius:8px;line-height:1.2}
+.fbox.unk{border-color:rgba(255,204,0,.9);border-style:dashed}
+.fbox span{position:absolute;left:50%;transform:translateX(-50%);bottom:-24px;white-space:nowrap;background:rgba(0,0,0,.65);color:#fff;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;backdrop-filter:blur(6px)}
+.hidebox .fbox{display:none}
+.vbot{padding:10px 16px calc(var(--sab) + 12px)}
+.rxbar{display:flex;justify-content:center;gap:6px;margin-bottom:12px}
+.rxbar button{border:0;background:rgba(255,255,255,.12);border-radius:99px;padding:6px 10px;font-size:20px;color:#fff;display:flex;align-items:center;gap:4px}
+.rxbar button.on{background:rgba(125,122,255,.55)}
+.rxbar small{font-size:13px;font-weight:600}
+.vact{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.vact .btn{background:rgba(255,255,255,.14);color:#fff}
+.vact .btn.green{background:var(--green)}
+.vact .btn.fill{background:var(--accent)}
+.vact .btn.red{color:#ff6961}
+/* camera */
+#cam{position:fixed;inset:0;z-index:50;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:var(--sat) 0 var(--sab)}
+#cam.show{display:flex}
+#cam video{width:100%;max-width:600px;max-height:70dvh;object-fit:cover;transform:scaleX(-1)}
+#cam .shutter{width:72px;height:72px;border-radius:50%;background:#fff;border:5px solid #000;box-shadow:0 0 0 3px #fff}
+#cam .cancel{position:absolute;left:20px;bottom:calc(var(--sab) + 34px);border:0;background:none;color:#fff;font-size:17px}
+/* banners & toasts */
+#banner{position:fixed;left:8px;right:8px;top:calc(var(--sat) + 8px);z-index:60;max-width:440px;margin:0 auto;background:var(--bar);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:18px;padding:12px 14px;display:flex;gap:11px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.18);transform:translateY(-140%);transition:transform .4s cubic-bezier(.2,.9,.25,1);cursor:pointer}
+#banner.show{transform:none}
+#banner img{width:38px;height:38px;border-radius:9px}
+#banner .bt{font-size:15px;font-weight:600;display:flex;justify-content:space-between}
+#banner .bt small{color:var(--muted);font-weight:400;font-size:13px}
+#banner .bb{font-size:15px}
+#toast{position:fixed;left:50%;bottom:calc(var(--sab) + 96px);transform:translate(-50%,10px);opacity:0;transition:.25s;background:rgba(30,30,32,.92);color:#fff;padding:11px 18px;border-radius:14px;font-size:15px;font-weight:500;z-index:70;pointer-events:none;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#busy{position:fixed;left:50%;top:calc(var(--sat) + 10px);transform:translateX(-50%);z-index:65;display:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;padding:8px 16px;border-radius:99px;box-shadow:0 6px 20px rgba(0,0,0,.2);white-space:nowrap}
+#busy.show{display:block}
+.loading{display:flex;align-items:center;justify-content:center;min-height:80vh;color:var(--muted)}
+.notif{display:flex;gap:12px;align-items:center}
+.notif.unread .t{font-weight:600}
+.notif .when{color:var(--muted);font-size:13px;flex:none}
+.udot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none}
+.prof{text-align:center;padding:4px 16px 0}
+.prof .nm{font-size:24px;font-weight:700;margin-top:10px}
+.prof .un{color:var(--muted)}
+.prof .bio{margin-top:6px;font-size:15px}
+.stats{display:flex;background:var(--card);border-radius:14px;margin:18px 0 0;padding:12px 0}
+.stats div{flex:1;text-align:center}
+.stats b{display:block;font-size:20px}
+.stats span{font-size:12px;color:var(--muted)}
+.stats div+div{border-left:.5px solid var(--sep)}
+.linkbox{background:var(--card);border-radius:12px;padding:14px;font-size:14px;word-break:break-all;color:var(--muted);margin-bottom:12px;user-select:all;-webkit-user-select:all}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Loading…</div></div>
+<div id="viewer"></div>
+<div id="cam"><video id="cam-v" autoplay playsinline muted></video><button class="shutter" onclick="snap()" aria-label="Take Photo"></button><button class="cancel" onclick="closeCamera()">Cancel</button></div>
+<div id="banner" onclick="bannerTap()"></div>
+<div id="busy"></div>
+<div id="toast"></div>
+<script>
+/* =================================================================
+   InFrame — friends share event photos; face matching delivers each
+   photo to the people in it. Data syncs through Firebase Firestore.
+   ================================================================= */
+const FB_CONFIG = null; // set after the InFrame Firebase project is created
+const TERMS_VERSION = '2026-11-15';
+const MATCH = 0.55; // face distance cut-off; lower = stricter
+const FACEAPI = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/';
+const EMOJIS = ['😎','🤙','✌️','🫶','🌴','🏖️','🌊','🏄','🏔️','🏕️','🚲','🏃','⚽','🏀','🎾','⛳','🎸','🎧','🪩','🎉','🍕','🌮','🍣','☕','🍻','🍷','🍓','🐶','🐱','🦋','🌵','🌻','🔥','✨','🌙','☀️','📸','✈️','🎮','🎨'];
+const REACTS = ['❤️','😂','🔥','😍','🙌','💀'];
+const ICON = 'icon-192.png';
+
+/* ---------- small helpers ---------- */
+const $ = s => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const code = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const plural = (n, w, p) => `${n} ${n === 1 ? w : (p || w + 's')}`;
+const today = () => new Date().toLocaleDateString('en-CA');
+function fmtDate(d){ return d ? new Date(d + 'T12:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : ''; }
+function ago(t){ const s = (Date.now() - t) / 1000; if (s < 60) return 'now'; if (s < 3600) return Math.floor(s/60) + 'm'; if (s < 86400) return Math.floor(s/3600) + 'h'; if (s < 604800) return Math.floor(s/86400) + 'd'; return new Date(t).toLocaleDateString(undefined, {month:'short', day:'numeric'}); }
+function toast(m){ const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3000); }
+function busy(m){ const b = $('#busy'); if (m){ b.textContent = m; b.classList.add('show'); } else b.classList.remove('show'); }
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+const chevron = '<svg viewBox="0 0 13 21" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2 2.5 10.5 11 19"/></svg>';
+
+/* ---------- local device memory ---------- */
+let ME = localStorage.getItem('inframe_me') || null;
+function accounts(){ try { return JSON.parse(localStorage.getItem('inframe_accounts') || '[]'); } catch { return []; } }
+function rememberAccount(id){ const a = accounts().filter(x => x !== id); a.unshift(id); localStorage.setItem('inframe_accounts', JSON.stringify(a)); }
+function forgetAccount(id){ localStorage.setItem('inframe_accounts', JSON.stringify(accounts().filter(x => x !== id))); }
+function setMe(id){ ME = id; if (id){ localStorage.setItem('inframe_me', id); rememberAccount(id); } else localStorage.removeItem('inframe_me'); }
+
+/* ---------- Firebase ---------- */
+let F = null, db = null;
+const col = n => F.collection(db, 'inframe_' + n);
+const ref = (n, id) => F.doc(db, 'inframe_' + n, id);
+async function initFirebase(){
+  const [app, fs] = await Promise.all([
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'),
+  ]);
+  F = fs;
+  const a = app.initializeApp(FB_CONFIG);
+  try { db = fs.initializeFirestore(a, {localCache: fs.persistentLocalCache({tabManager: fs.persistentMultipleTabManager()})}); }
+  catch { db = fs.getFirestore(a); }
+}
+
+/* ---------- synced data ---------- */
+const C = { users:{}, groups:{}, sEvents:{}, gEvents:{}, photos:{}, extra:{}, extraEvents:{}, deliveries:{}, notifs:[] };
+const BOOT_AT = Date.now();
+let subs = {}, userSubs = {}, dyn = {}, notifLoaded = false;
+const toMap = snap => Object.fromEntries(snap.docs.map(d => [d.id, {id:d.id, ...d.data()}]));
+function syncErr(e){ console.warn(e); if (e?.code === 'permission-denied') toast('Sync is blocked. The database rules need updating.'); }
+function listen(key, q, fn){ subs[key]?.(); subs[key] = F.onSnapshot(q, fn, syncErr); }
+function stopAll(){
+  Object.values(subs).forEach(u => u()); Object.values(userSubs).forEach(u => u());
+  Object.values(dyn).forEach(d => d.unsubs.forEach(u => u()));
+  subs = {}; userSubs = {}; dyn = {}; notifLoaded = false;
+  Object.assign(C, {users:{}, groups:{}, sEvents:{}, gEvents:{}, photos:{}, extra:{}, extraEvents:{}, deliveries:{}, notifs:[]});
+}
+// Live "where field in [...]" listener that re-subscribes only when the list changes (Firestore allows 30 per query).
+function subIn(name, coll, field, values, onDocs){
+  const vals = [...new Set(values)].sort(), sig = vals.join(',');
+  if (dyn[name] && dyn[name].sig === sig) return;
+  dyn[name]?.unsubs.forEach(u => u());
+  const parts = {}, unsubs = [];
+  for (let i = 0; i < vals.length; i += 30){
+    const k = i;
+    unsubs.push(F.onSnapshot(F.query(col(coll), F.where(field, 'in', vals.slice(i, i + 30))), s => { parts[k] = s.docs.map(d => ({id:d.id, ...d.data()})); onDocs(Object.values(parts).flat()); }, syncErr));
+  }
+  dyn[name] = {sig, unsubs};
+  if (!vals.length) onDocs([]);
+}
+function watchUsers(ids){
+  ids.forEach(id => {
+    if (!id || userSubs[id]) return;
+    userSubs[id] = F.onSnapshot(ref('users', id), s => {
+      if (s.exists()) C.users[id] = {id, ...s.data()}; else delete C.users[id];
+      if (id === ME && !s.exists() && !s.metadata.fromCache){ signOutLocal(); return; }
+      later();
+    }, syncErr);
+  });
+}
+function subscribeAll(){
+  watchUsers([ME]);
+  listen('groups', F.query(col('groups'), F.where('members', 'array-contains', ME)), s => { C.groups = toMap(s); deps(); });
+  listen('sEvents', F.query(col('events'), F.where('members', 'array-contains', ME)), s => { C.sEvents = toMap(s); deps(); });
+  listen('deliv', F.query(col('deliveries'), F.where('userId', '==', ME)), s => {
+    C.deliveries = {}; s.docs.forEach(d => { C.deliveries[d.data().photoId] = {id:d.id, ...d.data()}; });
+    fetchExtras(); badge(); later();
+  });
+  listen('notifs', F.query(col('notifications'), F.where('userId', '==', ME)), s => {
+    if (notifLoaded) s.docChanges().forEach(ch => { if (ch.type === 'added'){ const n = {id:ch.doc.id, ...ch.doc.data()}; if (n.at > BOOT_AT) incoming(n); } });
+    notifLoaded = true;
+    C.notifs = s.docs.map(d => ({id:d.id, ...d.data()})).sort((a, b) => b.at - a.at);
+    watchUsers(C.notifs.slice(0, 40).map(n => n.fromId)); badge(); later();
+  });
+}
+function deps(){
+  subIn('gEvents', 'events', 'groupId', Object.keys(C.groups), docs => { C.gEvents = Object.fromEntries(docs.map(d => [d.id, d])); photosDeps(); });
+  photosDeps();
+  watchUsers([...Object.values(C.groups).flatMap(g => g.members), ...Object.values(C.sEvents).flatMap(e => e.members)]);
+  later();
+}
+function photosDeps(){
+  subIn('photos', 'photos', 'eventId', [...Object.keys(C.sEvents), ...Object.keys(C.gEvents)], docs => {
+    C.photos = Object.fromEntries(docs.map(d => [d.id, d]));
+    watchUsers(docs.map(p => p.uploaderId)); fetchExtras(); later();
+  });
+}
+// Photos you kept from events you've since left still show in My Photos.
+async function fetchExtras(){
+  for (const d of Object.values(C.deliveries)){
+    if (C.photos[d.photoId] || C.extra[d.photoId] || !dyn.photos) continue;
+    C.extra[d.photoId] = {id:d.photoId, loading:true, faces:[]};
+    const s = await F.getDoc(ref('photos', d.photoId));
+    if (s.exists()){ C.extra[d.photoId] = {id:s.id, ...s.data()}; const eid = s.data().eventId;
+      if (!evt(eid) && !C.extraEvents[eid]){ const e = await F.getDoc(ref('events', eid)); if (e.exists()) C.extraEvents[eid] = {id:e.id, ...e.data()}; } }
+    later();
+  }
+}
+const fullCache = new Map();
+async function getFull(id){
+  if (!fullCache.has(id)){ const s = await F.getDoc(ref('images', id)); fullCache.set(id, s.exists() ? s.data().data : null); }
+  return fullCache.get(id);
+}
+
+/* ---------- lookups ---------- */
+const me = () => C.users[ME];
+const user = id => C.users[id];
+const evt = id => C.sEvents[id] || C.gEvents[id] || C.extraEvents[id];
+const photo = id => C.photos[id] || C.extra[id];
+const handle = id => { const u = user(id); return u ? '@' + u.username : 'Someone'; };
+const fullName = u => u ? `${u.first} ${u.last}.` : '';
+function eventMembers(e){ if (!e) return []; if (e.groupId){ const g = C.groups[e.groupId]; return g ? g.members : []; } return e.members || []; }
+const myDel = pid => C.deliveries[pid];
+const pending = () => Object.values(C.deliveries).filter(d => d.status === 'pending' && photo(d.photoId) && !photo(d.photoId).loading);
+const unreadCount = () => C.notifs.filter(n => !n.read).length;
+const isUncat = p => !p.faces?.length || p.faces.some(f => !f.matchId);
+const uncatFor = eid => Object.values(C.photos).filter(p => p.eventId === eid && isUncat(p) && !myDel(p.id)).sort((a, b) => b.createdAt - a.createdAt);
+function avatar(u, size = 36, withEmoji){
+  let inner;
+  if (!u) inner = `<span class="av" style="width:${size}px;height:${size}px"></span>`;
+  else if (u.avatar) inner = `<img class="av" src="${u.avatar}" alt="" style="width:${size}px;height:${size}px">`;
+  else inner = `<span class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size * .4)}px">${esc((u.first || '?')[0])}${esc(u.last || '')}</span>`;
+  if (withEmoji && u?.emoji){ const e = Math.max(18, Math.round(size * .36)); return `<span class="avw">${inner}<span class="em" style="width:${e}px;height:${e}px;font-size:${Math.round(e * .62)}px">${u.emoji}</span></span>`; }
+  return inner;
+}
+const sq = (thing, big) => `<span class="sq ${big ? 'big' : ''}">${thing.emoji ? thing.emoji : esc((thing.name || '?')[0].toUpperCase())}</span>`;
+
+/* ---------- notifications ---------- */
+async function notify(userIds, text, link){
+  const ids = [...new Set(userIds)].filter(id => id && id !== ME);
+  if (!ids.length) return;
+  const b = F.writeBatch(db);
+  ids.forEach(id => b.set(F.doc(col('notifications')), {userId:id, fromId:ME, text, link:link || null, read:false, at:Date.now()}));
+  await b.commit();
+}
+let bannerLink = null;
+function incoming(n){
+  bannerLink = n.link;
+  $('#banner').innerHTML = `<img src="${ICON}" alt=""><div style="flex:1;min-width:0"><div class="bt">InFrame <small>now</small></div><div class="bb">${esc(n.text)}</div></div>`;
+  $('#banner').classList.add('show'); clearTimeout(window._bh); window._bh = setTimeout(() => $('#banner').classList.remove('show'), 4500);
+  if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted')
+    navigator.serviceWorker?.ready.then(r => r.showNotification('InFrame', {body:n.text, icon:ICON, badge:ICON, tag:n.id})).catch(() => {});
+}
+function bannerTap(){ $('#banner').classList.remove('show'); openLink(bannerLink); }
+function openLink(l){ if (!l) return go({name:'alerts'}); if (l.v === 'inbox') tab('inbox'); else if (l.v === 'event' && evt(l.id)) go({name:'event', id:l.id, seg:l.seg || 'mine'}); else if (l.v === 'group' && C.groups[l.id]) go({name:'group', id:l.id}); else if (l.v === 'photo' && photo(l.id)) openViewer(l.id, [l.id]); else go({name:'alerts'}); }
+function badge(){ const n = pending().length + unreadCount(); try { n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.(); } catch {} }
+async function enableNotifications(){
+  if (!('Notification' in window)){
+    return toast(isIOS && !standalone ? 'Add InFrame to your Home Screen first, then turn on notifications.' : "This browser doesn't support notifications.");
+  }
+  const p = await Notification.requestPermission();
+  toast(p === 'granted' ? 'Notifications on.' : 'Notifications are off. You can change this in Settings.');
+  later();
+}
+async function markAllRead(){
+  const un = C.notifs.filter(n => !n.read); if (!un.length) return;
+  const b = F.writeBatch(db); un.forEach(n => b.update(ref('notifications', n.id), {read:true})); await b.commit();
+}
+
+/* ---------- face scanning (in the browser) ---------- */
+let modelsReady = null;
+function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+function ensureModels(){
+  if (!modelsReady){
+    busy('Loading Face Scanner…');
+    modelsReady = (async () => {
+      if (!window.faceapi) await loadScript(FACEAPI + 'dist/face-api.js');
+      const u = FACEAPI + 'model/';
+      await Promise.all([faceapi.nets.ssdMobilenetv1.loadFromUri(u), faceapi.nets.faceLandmark68Net.loadFromUri(u), faceapi.nets.faceRecognitionNet.loadFromUri(u)]);
+    })().finally(() => busy()).catch(() => { modelsReady = null; throw 'Could not load the face scanner. Check your connection.'; });
+  }
+  return modelsReady;
+}
+function loadImage(url){ return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej("Couldn't open that photo."); i.src = url; }); }
+async function toCanvas(src, max){
+  const url = typeof src === 'string' ? src : URL.createObjectURL(src);
+  const img = await loadImage(url); if (typeof src !== 'string') URL.revokeObjectURL(url);
+  const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
+}
+function shrink(canvas, max, q){
+  const s = Math.min(1, max / Math.max(canvas.width, canvas.height));
+  const c = document.createElement('canvas'); c.width = Math.round(canvas.width * s); c.height = Math.round(canvas.height * s);
+  c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q);
+}
+function squareCrop(canvas, size, box){
+  const side = box ? Math.max(box.width, box.height) * 1.8 : Math.min(canvas.width, canvas.height);
+  const cx = box ? box.x + box.width / 2 : canvas.width / 2, cy = box ? box.y + box.height / 2 : canvas.height / 2;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  c.getContext('2d').drawImage(canvas, cx - side / 2, cy - side / 2, side, side, 0, 0, size, size);
+  return c.toDataURL('image/jpeg', .85);
+}
+const detect = c => faceapi.detectAllFaces(c, new faceapi.SsdMobilenetv1Options({minConfidence:.5, maxResults:60})).withFaceLandmarks().withFaceDescriptors();
+function relBox(d, c){ const b = d.detection.box; return {x:b.x / c.width, y:b.y / c.height, w:b.width / c.width, h:b.height / c.height}; }
+function iou(a, b){ const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y), x2 = Math.min(a.x + a.w, b.x + b.w), y2 = Math.min(a.y + a.h, b.y + b.h); const i = Math.max(0, x2 - x1) * Math.max(0, y2 - y1); return i / (a.w * a.h + b.w * b.h - i || 1); }
+// Pair each face with the closest event member; each person is used once per photo.
+// Only face boxes + who matched are saved — never face signatures of people in photos.
+function assign(dets, c, members){
+  const faces = dets.map(d => ({box:relBox(d, c), matchId:null})), pairs = [];
+  dets.forEach((d, i) => members.forEach(u => { const dist = faceapi.euclideanDistance(d.descriptor, u.descriptor); if (dist < MATCH) pairs.push({i, u:u.id, dist}); }));
+  pairs.sort((a, b) => a.dist - b.dist); const used = new Set();
+  for (const p of pairs){ if (faces[p.i].matchId || used.has(p.u)) continue; faces[p.i].matchId = p.u; used.add(p.u); }
+  return faces;
+}
+
+/* ---------- camera ---------- */
+let camStream = null, camCb = null;
+async function openCamera(cb){
+  try { camStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:1280}}}); }
+  catch { toast('Camera not available. Choose a photo instead.'); return; }
+  camCb = cb; $('#cam-v').srcObject = camStream; $('#cam').classList.add('show');
+}
+function closeCamera(){ camStream?.getTracks().forEach(t => t.stop()); camStream = null; $('#cam').classList.remove('show'); }
+function snap(){
+  const v = $('#cam-v'), c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+  const x = c.getContext('2d'); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(v, 0, 0);
+  const url = c.toDataURL('image/jpeg', .9), cb = camCb; closeCamera(); cb && cb(url);
+}
+
+/* ---------- face selfie widget (signup + profile) ---------- */
+let face = null; // {descriptor, thumb}
+function faceButtons(err){
+  return `<div class="row" style="justify-content:center">
+    <button class="btn fill" onclick="openCamera(processFace)">Take Selfie</button>
+    <label class="btn tint">Choose Photo<input type="file" accept="image/*" hidden onchange="this.files[0]&&processFace(this.files[0])"></label></div>
+    ${err ? `<div class="err">${esc(err)}</div>` : ''}`;
+}
+async function processFace(src){
+  const box = $('#facebox'); if (!box) return;
+  box.innerHTML = '<div class="hint" style="margin:20px 0">Scanning your face…</div>';
+  try {
+    await ensureModels();
+    const c = await toCanvas(src, 900), d = await detect(c);
+    if (!d.length) throw 'No face found. Try brighter light, looking straight at the camera.';
+    if (d.length > 1) throw 'More than one face found. This selfie needs to be just you.';
+    face = {descriptor:Array.from(d[0].descriptor), thumb:squareCrop(c, 320, d[0].detection.box)};
+    box.innerHTML = `<img class="facecirc" src="${face.thumb}" alt=""><div class="okmsg">Face Found</div><button class="btn sm tint" onclick="face=null;$('#facebox').innerHTML=faceButtons()">Retake</button>`;
+  } catch (e){ face = null; box.innerHTML = faceButtons(typeof e === 'string' ? e : "Couldn't read that photo."); }
+}
+
+/* ---------- profile-picture widget ---------- */
+let pickedAvatar = null;
+async function setAvatarFrom(src){ try { const c = await toCanvas(src, 1200); pickedAvatar = squareCrop(c, 320); const i = $('#avimg'); if (i) i.src = pickedAvatar; } catch (e){ toast(e); } }
+function avatarPicker(current, allowFace){
+  return `<div class="avpick"><img id="avimg" src="${current}" alt="">
+    <div class="row" style="justify-content:center">
+      <button class="btn sm tint" onclick="openCamera(setAvatarFrom)">Take Photo</button>
+      <label class="btn sm tint">Choose Photo<input type="file" accept="image/*" hidden onchange="this.files[0]&&setAvatarFrom(this.files[0])"></label>
+      ${allowFace ? `<button class="btn sm tint" onclick="pickedAvatar=${allowFace};$('#avimg').src=pickedAvatar">Use Selfie</button>` : ''}
+    </div></div>`;
+}
+let pickedEmoji = '';
+function emojiGrid(sel){ pickedEmoji = sel || ''; return `<div class="emojis">${EMOJIS.map(e => `<button class="${e === sel ? 'on' : ''}" onclick="pickEmoji(this,'${e}')">${e}</button>`).join('')}</div>`; }
+function pickEmoji(btn, e){ const on = pickedEmoji === e; btn.parentNode.querySelectorAll('button').forEach(b => b.classList.remove('on')); pickedEmoji = on ? '' : e; if (!on) btn.classList.add('on'); }
+function blankAvatar(){ return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e5ea"/><circle cx="50" cy="40" r="18" fill="#aeaeb2"/><path d="M18 92c4-18 17-28 32-28s28 10 32 28" fill="#aeaeb2"/></svg>'); }
+
+/* ---------- usernames ---------- */
+const cleanUsername = s => s.trim().toLowerCase().replace(/^@/, '');
+function usernameProblem(u){ if (!/^[a-z0-9._]{3,20}$/.test(u)) return 'Usernames are 3–20 letters, numbers, dots or underscores.'; return null; }
+async function claimUsername(name, userId, old){
+  await F.runTransaction(db, async t => {
+    const r = ref('usernames', name), s = await t.get(r);
+    if (s.exists() && s.data().userId !== userId) throw 'That username is taken.';
+    t.set(r, {userId});
+    if (old && old !== name) t.delete(ref('usernames', old));
+  });
+}
+
+/* ---------- signup (3 steps) ---------- */
+let su = {step:1, first:'', last:'', username:''};
+function inviteBannerHTML(){ return sessionStorage.getItem('inframe_join') ? `<div class="callout" id="invb"><img src="${ICON}" alt=""><div>You've been invited to share photos on InFrame. Make your profile to join.</div></div>` : ''; }
+function renderSignup(){
+  const steps = `<div class="steps">${[1,2,3].map(n => `<i class="${n <= su.step ? 'on' : ''}"></i>`).join('')}</div>`;
+  let body = '';
+  if (su.step === 1) body = `
+    <img class="logo" src="icon-192.png" alt="">
+    <h1>InFrame</h1><p class="hint">Snap together. Everyone gets the photos they're in.</p>
+    ${inviteBannerHTML()}${steps}
+    <div class="field">
+      <label><span>First Name</span><input id="su-first" value="${esc(su.first)}" autocomplete="given-name" placeholder="Required"></label>
+      <label><span>Last Initial</span><input id="su-last" value="${esc(su.last)}" maxlength="1" placeholder="Required" oninput="this.value=this.value.replace(/[^a-z]/gi,'').toUpperCase()"></label>
+      <label><span>Username</span><span class="at">@</span><input id="su-user" value="${esc(su.username)}" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="yourname"></label>
+    </div>
+    <div class="fnote">Friends see your first name, last initial and username.</div>
+    <div class="grow"></div>
+    <button class="btn fill full" onclick="suNext1()">Continue</button>
+    <button class="link" onclick="useTestAccount()">Use Test Account</button>
+    ${prevMe ? `<button class="link" onclick="cancelNewAccount()">Back To My Account</button>` : ''}`;
+  if (su.step === 2) body = `
+    <h1>Face Match Selfie</h1><p class="hint">This is how InFrame finds you in your friends' photos. It's only used for matching and is never posted.</p>${steps}
+    <div class="box" id="facebox">${face ? `<img class="facecirc" src="${face.thumb}" alt=""><div class="okmsg">Face Found</div><button class="btn sm tint" onclick="face=null;$('#facebox').innerHTML=faceButtons()">Retake</button>` : faceButtons()}</div>
+    <label class="check"><input type="checkbox" id="su-bio"><span>I agree that InFrame may create a face template from my selfie and use it only to find me in photos shared in my groups and events, as described in the <a href="terms.html#biometric" target="_blank">Biometric Data Policy</a>.</span></label>
+    <div class="grow"></div>
+    <button class="btn fill full" onclick="suNext2()">Continue</button>
+    <button class="link" onclick="su.step=1;renderSignup()">Back</button>`;
+  if (su.step === 3) body = `
+    <h1>Your Profile</h1><p class="hint">Pick a profile picture and an emoji that's you.</p>${steps}
+    ${avatarPicker(pickedAvatar || face.thumb, 'face.thumb')}
+    <div class="sechead" style="margin-top:0">Your Emoji</div>${emojiGrid(pickedEmoji)}
+    <div class="field"><label><span>Bio</span><input id="su-bioline" maxlength="80" placeholder="Optional"></label></div>
+    <label class="check"><input type="checkbox" id="su-terms"><span>I agree to the <a href="terms.html" target="_blank">Terms of Service and Privacy Policy</a>.</span></label>
+    <div class="grow"></div>
+    <button class="btn fill full" id="su-go" onclick="suCreate()">Create Account</button>
+    <button class="link" onclick="su.step=2;renderSignup()">Back</button>`;
+  $('#app').innerHTML = `<div class="onb" id="signup">${body}</div>`;
+  window.scrollTo(0, 0);
+}
+async function suNext1(){
+  su.first = $('#su-first').value.trim(); su.last = $('#su-last').value.trim().toUpperCase(); su.username = cleanUsername($('#su-user').value);
+  if (!su.first) return toast('Enter your first name.');
+  if (!/^[A-Z]$/.test(su.last)) return toast('Enter the first letter of your last name.');
+  const p = usernameProblem(su.username); if (p) return toast(p);
+  const s = await F.getDoc(ref('usernames', su.username));
+  if (s.exists()) return toast('That username is taken.');
+  su.step = 2; renderSignup();
+}
+function suNext2(){
+  if (!face) return toast('Add your selfie first.');
+  if (!$('#su-bio').checked) return toast('Please agree to face matching to continue.');
+  su.bioConsent = Date.now(); su.step = 3; renderSignup();
+}
+async function suCreate(){
+  if (!$('#su-terms').checked) return toast('Please agree to the Terms to continue.');
+  const btn = $('#su-go'); btn.disabled = true;
+  const id = uid();
+  try {
+    await claimUsername(su.username, id);
+    const now = Date.now();
+    await F.setDoc(ref('users', id), {
+      first:su.first[0].toUpperCase() + su.first.slice(1), last:su.last, username:su.username,
+      avatar:pickedAvatar || face.thumb, emoji:pickedEmoji, bio:$('#su-bioline').value.trim(),
+      faceThumb:face.thumb, descriptor:face.descriptor,
+      termsVersion:TERMS_VERSION, termsAcceptedAt:now, biometricConsentAt:su.bioConsent, createdAt:now,
+    });
+    face = null; pickedAvatar = null; pickedEmoji = ''; su = {step:1, first:'', last:'', username:''}; prevMe = null;
+    setMe(id); start(); toast('Welcome to InFrame!');
+  } catch (e){ btn.disabled = false; toast(typeof e === 'string' ? e : 'Something went wrong. Try again.'); if (e === 'That username is taken.'){ su.step = 1; renderSignup(); } }
+}
+let prevMe = null;
+function newAccount(){ prevMe = ME; closeSheet(); stopAll(); setMe(null); su = {step:1, first:'', last:'', username:''}; renderSignup(); }
+function cancelNewAccount(){ const id = prevMe; prevMe = null; setMe(id); start(); }
+
+/* ---------- test account ---------- */
+async function useTestAccount(){
+  busy('Opening Test Account…');
+  try {
+    const now = Date.now();
+    if (!(await F.getDoc(ref('users', 'test'))).exists()){
+      await F.setDoc(ref('usernames', 'test'), {userId:'test'});
+      await F.setDoc(ref('users', 'test'), {first:'Test', last:'T', username:'test', avatar:'', emoji:'🧪', bio:'Shared test account', isTest:true, descriptor:null, termsVersion:TERMS_VERSION, createdAt:now});
+    }
+    const g = ref('groups', 'test-group');
+    if (!(await F.getDoc(g)).exists()) await F.setDoc(g, {name:'Test Group', emoji:'🎉', members:['test'], inviteCode:'testgroup', createdBy:'test', createdAt:now});
+    else await F.updateDoc(g, {members:F.arrayUnion('test')});
+    const e = ref('events', 'test-event');
+    if (!(await F.getDoc(e)).exists()) await F.setDoc(e, {name:'Test Event', emoji:'📸', date:today(), groupId:'test-group', members:[], inviteCode:'testevent', createdBy:'test', createdAt:now});
+    prevMe = null; closeSheet(); setMe('test'); start();
+    toast('Signed in as the Test Account.');
+  } catch (e){ console.warn(e); toast("Couldn't open the Test Account."); }
+  busy();
+}
+
+/* ---------- navigation ---------- */
+let view = {name:'tab', tab:'groups'}, stack = [];
+function tab(t){ stack = []; view = {name:'tab', tab:t}; render(); window.scrollTo(0, 0); if (t === 'alerts') markAllRead(); }
+function go(v){ stack.push({view, y:scrollY}); view = {...v, at:Date.now()}; render(); window.scrollTo(0, 0); if (v.name === 'alerts') setTimeout(markAllRead, 600); }
+function back(){ const p = stack.pop(); view = p ? p.view : {name:'tab', tab:'groups'}; render(); window.scrollTo(0, p ? p.y : 0); }
+let renderQueued = false;
+function later(){ if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); }
+
+/* ---------- sheets ---------- */
+function openSheet(html){
+  closeSheet(true);
+  const d = document.createElement('div'); d.className = 'dim'; d.id = 'dim';
+  d.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`;
+  d.addEventListener('click', e => { if (e.target === d) closeSheet(); });
+  document.body.appendChild(d); requestAnimationFrame(() => d.classList.add('show'));
+  document.body.style.overflow = 'hidden';
+}
+function closeSheet(instant){
+  const d = $('#dim'); if (!d) return; document.body.style.overflow = '';
+  if (instant === true) return d.remove();
+  d.classList.remove('show'); setTimeout(() => d.remove(), 280);
+}
+const sheetHead = (title, done, fn) => `<div class="shh"><button onclick="closeSheet()">Cancel</button><div class="ttl">${title}</div>${done ? `<button class="done" onclick="${fn}">${done}</button>` : '<span style="min-width:60px"></span>'}</div>`;
+
+/* ---------- groups & events ---------- */
+function newGroupSheet(){
+  openSheet(`${sheetHead('New Group', 'Create', 'createGroup()')}
+    <div class="field"><label><span>Name</span><input id="g-name" placeholder="College Crew"></label></div>
+    <div class="sechead" style="margin-top:6px">Group Emoji</div>${emojiGrid('')}
+    <div class="fnote">A group is your regular crew. You'll make events inside it whenever you go out.</div>`);
+  setTimeout(() => $('#g-name')?.focus(), 350);
+}
+async function createGroup(){
+  const name = $('#g-name').value.trim(); if (!name) return toast('Give your group a name.');
+  const r = F.doc(col('groups'));
+  await F.setDoc(r, {name, emoji:pickedEmoji, members:[ME], inviteCode:code(), createdBy:ME, createdAt:Date.now()});
+  closeSheet(); go({name:'group', id:r.id}); setTimeout(() => inviteSheet('group', r.id), 500);
+}
+function newEventSheet(groupId){
+  const opts = Object.values(C.groups).map(g => `<option value="${g.id}" ${g.id === groupId ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+  openSheet(`${sheetHead('New Event', 'Create', 'createEvent()')}
+    <div class="field">
+      <label><span>Name</span><input id="e-name" placeholder="Lake Weekend"></label>
+      <label><span>Date</span><input id="e-date" type="date" value="${today()}"></label>
+      <label><span>Part Of</span><select id="e-group" style="flex:1;border:0;background:none;padding:12px 0;text-align:right;-webkit-appearance:none;color:var(--muted)"><option value="">No Group (Single Event)</option>${opts}</select></label>
+    </div>
+    <div class="sechead" style="margin-top:6px">Event Emoji</div>${emojiGrid('')}`);
+  setTimeout(() => $('#e-name')?.focus(), 350);
+}
+async function createEvent(){
+  const name = $('#e-name').value.trim(); if (!name) return toast('Give your event a name.');
+  const groupId = $('#e-group').value || null, r = F.doc(col('events'));
+  await F.setDoc(r, {name, emoji:pickedEmoji, date:$('#e-date').value, groupId, members:groupId ? [] : [ME], inviteCode:groupId ? null : code(), createdBy:ME, createdAt:Date.now()});
+  if (groupId) notify(C.groups[groupId].members, `${handle(ME)} started ${name} in ${C.groups[groupId].name}`, {v:'event', id:r.id});
+  closeSheet(); go({name:'event', id:r.id, seg:'mine'});
+}
+function inviteLink(kind, id){ const t = kind === 'group' ? C.groups[id] : evt(id); return `${location.origin}${location.pathname}?join=${t.inviteCode}`; }
+function inviteSheet(kind, id){
+  const t = kind === 'group' ? C.groups[id] : evt(id), link = inviteLink(kind, id);
+  openSheet(`${sheetHead('Invite Friends')}
+    <div class="hero">${sq(t, true)}<h1>${esc(t.name)}</h1><div class="s">Anyone with this link can join and get the photos they're in.</div></div>
+    <div style="height:18px"></div><div class="linkbox">${esc(link)}</div>
+    <div class="row">${navigator.share ? `<button class="btn fill" style="flex:1" onclick="shareInvite('${kind}','${id}')">Share Link</button>` : ''}
+    <button class="btn tint" style="flex:1" onclick="copyText('${esc(link)}')">Copy Link</button></div>`);
+}
+async function shareInvite(kind, id){ const t = kind === 'group' ? C.groups[id] : evt(id); try { await navigator.share({title:'InFrame', text:`Join ${t.name} on InFrame so we all get our photos`, url:inviteLink(kind, id)}); } catch {} }
+async function copyText(t){ try { await navigator.clipboard.writeText(t); toast('Copied.'); } catch { toast('Press and hold the link to copy it.'); } }
+async function findInvite(c){
+  for (const kind of ['groups', 'events']){
+    const s = await F.getDocs(F.query(col(kind), F.where('inviteCode', '==', c), F.limit(1)));
+    if (!s.empty) return {kind:kind === 'groups' ? 'group' : 'event', id:s.docs[0].id, data:s.docs[0].data()};
+  }
+  return null;
+}
+async function maybeJoin(){
+  const c = sessionStorage.getItem('inframe_join'); if (!c || !ME) return;
+  sessionStorage.removeItem('inframe_join');
+  const t = await findInvite(c);
+  if (!t) return toast("That invite link isn't valid anymore.");
+  if ((t.data.members || []).includes(ME)){ return setTimeout(() => go(t.kind === 'group' ? {name:'group', id:t.id} : {name:'event', id:t.id, seg:'mine'}), 400); }
+  const mem = t.data.members || []; watchUsers(mem.slice(0, 8));
+  setTimeout(() => openSheet(`${sheetHead('Invitation')}
+    <div class="hero">${sq(t.data, true)}<h1>${esc(t.data.name)}</h1><div class="s">${t.kind === 'group' ? 'Group' : 'Event'} · ${plural(mem.length, 'member')}</div>
+    <div class="stack" style="justify-content:center;margin:14px 0 22px">${mem.slice(0, 6).map(id => avatar(user(id), 36)).join('')}</div></div>
+    <button class="btn fill full" onclick="joinTarget('${t.kind}','${t.id}')">Join ${t.kind === 'group' ? 'Group' : 'Event'}</button>
+    <button class="link" onclick="closeSheet()">Not Now</button>`), 500);
+}
+async function joinTarget(kind, id){
+  const r = ref(kind === 'group' ? 'groups' : 'events', id), s = await F.getDoc(r);
+  if (!s.exists()) return toast('That no longer exists.');
+  await F.updateDoc(r, {members:F.arrayUnion(ME)});
+  notify(s.data().members, `${handle(ME)} joined ${s.data().name}`, {v:kind, id});
+  closeSheet(); toast(`You joined ${s.data().name}.`);
+  setTimeout(() => go(kind === 'group' ? {name:'group', id} : {name:'event', id, seg:'mine'}), 300);
+  let eids = [id];
+  if (kind === 'group') eids = (await F.getDocs(F.query(col('events'), F.where('groupId', '==', id)))).docs.map(d => d.id);
+  rescanForMe(eids);
+}
+async function leave(kind, id){
+  const t = kind === 'group' ? C.groups[id] : evt(id);
+  if (!confirm(`Leave ${t.name}? Photos you've kept stay in your photos.`)) return;
+  await F.updateDoc(ref(kind === 'group' ? 'groups' : 'events', id), {members:F.arrayRemove(ME)});
+  tab('groups');
+}
+
+/* ---------- uploading & matching ---------- */
+async function membersWithFaces(e, notMe){
+  const ids = eventMembers(e).filter(id => !(notMe || []).includes(id));
+  for (const id of ids) if (!C.users[id]){ const s = await F.getDoc(ref('users', id)); if (s.exists()) C.users[id] = {id, ...s.data()}; }
+  return ids.map(id => C.users[id]).filter(u => u?.descriptor);
+}
+async function upload(eid, list){
+  const files = [...list]; if (!files.length) return;
+  const e = evt(eid);
+  try { await ensureModels(); } catch (err){ return toast(err); }
+  const members = await membersWithFaces(e), perUser = {};
+  let done = 0, uncat = 0, failed = 0;
+  for (const f of files){
+    busy(`Scanning Photo ${done + failed + 1} of ${files.length}…`);
+    try {
+      const c = await toCanvas(f, 1600), dets = await detect(c), faces = assign(dets, c, members);
+      let data = null; for (const [m, q] of [[1600, .82], [1400, .75], [1200, .7], [1000, .65]]){ data = shrink(c, m, q); if (data.length < 900000) break; }
+      const r = F.doc(col('photos')), b = F.writeBatch(db), now = Date.now();
+      const matched = faces.filter(x => x.matchId).map(x => x.matchId);
+      b.set(r, {eventId:eid, uploaderId:ME, w:c.width, h:c.height, faces, matched, notMe:[], reactions:{}, thumb:shrink(c, 420, .72), createdAt:now});
+      b.set(ref('images', r.id), {data, eventId:eid});
+      matched.forEach(u => { b.set(ref('deliveries', `${r.id}_${u}`), {photoId:r.id, eventId:eid, userId:u, uploaderId:ME, status:'pending', via:'face', at:now}); perUser[u] = (perUser[u] || 0) + 1; });
+      await b.commit(); fullCache.set(r.id, data);
+      if (isUncat({faces})) uncat++; done++;
+    } catch (err){ console.warn(err); failed++; }
+  }
+  busy();
+  for (const [u, n] of Object.entries(perUser)) notify([u], `${handle(ME)} added ${plural(n, 'photo')} of you from ${e.name}`, {v:'inbox'});
+  if (uncat) notify(eventMembers(e), `${plural(uncat, 'new photo')} in ${e.name} need${uncat === 1 ? 's' : ''} someone to claim ${uncat === 1 ? 'it' : 'them'}`, {v:'event', id:eid, seg:'uncat'});
+  const sent = Object.values(perUser).reduce((a, b) => a + b, 0);
+  toast(`${plural(done, 'photo')} added · ${sent} sent · ${uncat} uncategorized${failed ? ` · ${failed} failed` : ''}`);
+}
+// After you join (or update your selfie), look through earlier photos for faces nobody was matched to.
+async function rescanForMe(eids){
+  const u = me() || (await F.getDoc(ref('users', ME))).data(); if (!u?.descriptor || !eids.length) return;
+  let photos = [];
+  for (let i = 0; i < eids.length; i += 30){ const s = await F.getDocs(F.query(col('photos'), F.where('eventId', 'in', eids.slice(i, i + 30)))); photos.push(...s.docs.map(d => ({id:d.id, ...d.data()}))); }
+  photos = photos.filter(p => p.faces?.some(f => !f.matchId) && !(p.notMe || []).includes(ME) && !(p.matched || []).includes(ME));
+  if (!photos.length) return;
+  try { await ensureModels(); } catch (e){ return; }
+  let n = 0, found = 0;
+  for (const p of photos){
+    busy(`Looking For You In Earlier Photos ${++n}/${photos.length}…`);
+    try {
+      const data = await getFull(p.id); if (!data) continue;
+      const c = await toCanvas(data, 1600), dets = await detect(c); let best = null;
+      dets.forEach(d => { const dist = faceapi.euclideanDistance(d.descriptor, u.descriptor); if (dist < MATCH && (!best || dist < best.dist)) best = {d, dist}; });
+      if (!best) continue;
+      const box = relBox(best.d, c); let idx = -1, bi = .3;
+      p.faces.forEach((f, i) => { if (f.matchId) return; const v = iou(f.box, box); if (v > bi){ bi = v; idx = i; } });
+      if (idx < 0) continue;
+      const b = F.writeBatch(db);
+      b.update(ref('photos', p.id), {faces:p.faces.map((f, i) => i === idx ? {...f, matchId:ME} : f), matched:F.arrayUnion(ME)});
+      b.set(ref('deliveries', `${p.id}_${ME}`), {photoId:p.id, eventId:p.eventId, userId:ME, uploaderId:p.uploaderId, status:'pending', via:'face', at:Date.now()});
+      await b.commit(); found++;
+    } catch (e){ console.warn(e); }
+  }
+  busy(); if (found) toast(`Found you in ${plural(found, 'earlier photo')}. Check your Inbox.`);
+}
+
+/* ---------- approving & reacting ---------- */
+async function decide(pid, action){
+  const d = myDel(pid), p = photo(pid); if (!d || !p) return;
+  if (action === 'keep'){ await F.updateDoc(ref('deliveries', d.id), {status:'approved'}); toast('Saved to Your Photos.'); }
+  if (action === 'skip'){ await F.updateDoc(ref('deliveries', d.id), {status:'declined'}); toast('Skipped.'); }
+  if (action === 'notme'){
+    const b = F.writeBatch(db);
+    b.update(ref('photos', pid), {faces:p.faces.map(f => f.matchId === ME ? {...f, matchId:null} : f), matched:F.arrayRemove(ME), notMe:F.arrayUnion(ME)});
+    b.delete(ref('deliveries', d.id)); await b.commit();
+    toast('Moved to Uncategorized so the right person can grab it.');
+  }
+  viewerAfterAction(pid);
+}
+async function keepAll(){ const b = F.writeBatch(db); pending().forEach(d => b.update(ref('deliveries', d.id), {status:'approved'})); await b.commit(); toast('All saved to Your Photos.'); }
+async function claim(pid){
+  const p = photo(pid);
+  await F.setDoc(ref('deliveries', `${pid}_${ME}`), {photoId:pid, eventId:p.eventId, userId:ME, uploaderId:p.uploaderId, status:'approved', via:'claimed', at:Date.now()});
+  notify([p.uploaderId], `${handle(ME)} found themselves in your photo from ${evt(p.eventId)?.name || 'an event'}`, {v:'photo', id:pid});
+  toast('Added to Your Photos.'); viewerAfterAction(pid);
+}
+async function react(pid, e){
+  const p = photo(pid), cur = p.reactions?.[ME];
+  await F.updateDoc(ref('photos', pid), {[`reactions.${ME}`]:cur === e ? F.deleteField() : e});
+  if (cur !== e) notify([p.uploaderId], `${handle(ME)} reacted ${e} to your photo`, {v:'photo', id:pid});
+}
+async function deletePhoto(pid){
+  if (!confirm('Delete this photo for everyone?')) return;
+  const ds = await F.getDocs(F.query(col('deliveries'), F.where('photoId', '==', pid)));
+  const b = F.writeBatch(db); ds.docs.forEach(d => b.delete(d.ref)); b.delete(ref('photos', pid)); b.delete(ref('images', pid)); await b.commit();
+  closeViewer(); toast('Photo deleted.');
+}
+async function savePhoto(pid){
+  const data = await getFull(pid); if (!data) return toast("Couldn't load the photo.");
+  const blob = await (await fetch(data)).blob(), file = new File([blob], `inframe-${pid}.jpg`, {type:'image/jpeg'});
+  if (navigator.canShare?.({files:[file]})){ try { await navigator.share({files:[file]}); } catch {} return; }
+  const a = document.createElement('a'); a.href = data; a.download = file.name; a.click();
+}
+
+/* ---------- full-screen photo viewer ---------- */
+let vList = [], vIdx = 0, vBoxes = true;
+async function openViewer(pid, list){ vList = list && list.length ? list : [pid]; vIdx = Math.max(0, vList.indexOf(pid)); $('#viewer').classList.add('show'); document.body.style.overflow = 'hidden'; drawViewer(); }
+function closeViewer(){ $('#viewer').classList.remove('show'); $('#viewer').innerHTML = ''; document.body.style.overflow = ''; }
+function viewerAfterAction(pid){ if (!$('#viewer').classList.contains('show')) return; if (view.name === 'tab' && view.tab === 'inbox'){ vList = vList.filter(x => x !== pid); if (!vList.length) return closeViewer(); vIdx = Math.min(vIdx, vList.length - 1); } setTimeout(drawViewer, 150); }
+async function drawViewer(){
+  const pid = vList[vIdx], p = photo(pid); if (!p) return closeViewer();
+  const e = evt(p.eventId), d = myDel(pid);
+  const boxes = (p.faces || []).map(f => `<div class="fbox ${f.matchId ? '' : 'unk'}" style="left:${f.box.x * 100}%;top:${f.box.y * 100}%;width:${f.box.w * 100}%;height:${f.box.h * 100}%"><span>${f.matchId ? esc(handle(f.matchId)) : '?'}</span></div>`).join('');
+  const counts = {}; Object.values(p.reactions || {}).forEach(r => counts[r] = (counts[r] || 0) + 1);
+  const mine = p.reactions?.[ME];
+  let acts = '';
+  if (d?.status === 'pending') acts = `<button class="btn green" onclick="decide('${pid}','keep')">Keep</button><button class="btn" onclick="decide('${pid}','skip')">Skip</button><button class="btn" onclick="decide('${pid}','notme')">Not Me</button>`;
+  else if (!d && isUncat(p) && eventMembers(e).includes(ME)) acts = `<button class="btn fill" onclick="claim('${pid}')">I'm In This One</button>`;
+  acts += `<button class="btn" onclick="savePhoto('${pid}')">Save</button>`;
+  if (p.uploaderId === ME) acts += `<button class="btn red" onclick="deletePhoto('${pid}')">Delete</button>`;
+  $('#viewer').innerHTML = `
+    <div class="vtop"><button onclick="closeViewer()" aria-label="Close">✕</button>
+      <div class="vt">${esc(e?.name || '')}<div class="vs">${esc(handle(p.uploaderId))} · ${ago(p.createdAt)}${vList.length > 1 ? ` · ${vIdx + 1} of ${vList.length}` : ''}</div></div>
+      <button onclick="vBoxes=!vBoxes;$('.vimg').classList.toggle('hidebox',!vBoxes)" aria-label="Show Names" style="font-size:13px;font-weight:700">@</button></div>
+    <div class="vimg ${vBoxes ? '' : 'hidebox'}"><div class="vwrap"><img src="${fullCache.get(pid) || p.thumb}" id="vimg" alt="">${boxes}</div></div>
+    <div class="vbot"><div class="rxbar">${REACTS.map(r => `<button class="${mine === r ? 'on' : ''}" onclick="react('${pid}','${r}')">${r}${counts[r] ? `<small>${counts[r]}</small>` : ''}</button>`).join('')}</div>
+      <div class="vact">${acts}</div></div>`;
+  const full = await getFull(pid); if (full && vList[vIdx] === pid && $('#vimg')) $('#vimg').src = full;
+  const area = $('.vimg'); let sx = null;
+  area.ontouchstart = ev => sx = ev.touches[0].clientX;
+  area.ontouchend = ev => { if (sx == null) return; const dx = ev.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1); };
+}
+function step(n){ const i = vIdx + n; if (i < 0 || i >= vList.length) return; vIdx = i; drawViewer(); }
+document.addEventListener('keydown', e => { if (!$('#viewer').classList.contains('show')) return; if (e.key === 'ArrowRight') step(1); if (e.key === 'ArrowLeft') step(-1); if (e.key === 'Escape') closeViewer(); });
+
+/* ---------- profile ---------- */
+function editProfileSheet(){
+  const u = me(); pickedAvatar = u.avatar || null;
+  openSheet(`${sheetHead('Edit Profile', 'Save', 'saveProfile()')}
+    ${avatarPicker(u.avatar || blankAvatar(), u.faceThumb ? 'me().faceThumb' : null)}
+    <div class="field">
+      <label><span>First Name</span><input id="p-first" value="${esc(u.first)}"></label>
+      <label><span>Last Initial</span><input id="p-last" value="${esc(u.last)}" maxlength="1" oninput="this.value=this.value.replace(/[^a-z]/gi,'').toUpperCase()"></label>
+      <label><span>Username</span><span class="at">@</span><input id="p-user" value="${esc(u.username)}" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+      <label><span>Bio</span><input id="p-bio" value="${esc(u.bio || '')}" maxlength="80" placeholder="Optional"></label>
+    </div>
+    <div class="sechead" style="margin-top:6px">Your Emoji</div>${emojiGrid(u.emoji || '')}`);
+}
+async function saveProfile(){
+  const u = me(), first = $('#p-first').value.trim(), last = $('#p-last').value.trim().toUpperCase(), username = cleanUsername($('#p-user').value);
+  if (!first) return toast('Enter your first name.');
+  if (!/^[A-Z]$/.test(last)) return toast('Enter your last initial.');
+  const p = usernameProblem(username); if (p) return toast(p);
+  try {
+    if (username !== u.username) await claimUsername(username, ME, u.username);
+    await F.updateDoc(ref('users', ME), {first:first[0].toUpperCase() + first.slice(1), last, username, bio:$('#p-bio').value.trim(), emoji:pickedEmoji, avatar:pickedAvatar || ''});
+    closeSheet(); toast('Profile saved.');
+  } catch (e){ toast(typeof e === 'string' ? e : "Couldn't save. Try again."); }
+}
+function faceSheet(){
+  const u = me(); face = null;
+  openSheet(`${sheetHead('Face Match Selfie', 'Save', 'saveFace()')}
+    <p class="hint">InFrame uses this to find you in friends' photos. Update it if your look changes a lot, like a new beard or glasses.</p>
+    <div class="box" id="facebox">${u.faceThumb ? `<img class="facecirc" src="${u.faceThumb}" alt=""><div class="hint">Current Selfie</div>` : '<div class="hint">No selfie yet, so photos of you won\'t be found automatically.</div>'}${faceButtons()}</div>
+    ${u.biometricConsentAt ? '' : `<label class="check"><input type="checkbox" id="f-consent"><span>I agree that InFrame may create a face template from my selfie, as described in the <a href="terms.html#biometric" target="_blank">Biometric Data Policy</a>.</span></label>`}
+    <div class="list"><button class="cell tap red" onclick="removeFace()">Remove My Face Data</button></div>`);
+}
+async function saveFace(){
+  if (!face) return toast('Take or choose a new selfie first.');
+  const c = $('#f-consent'); if (c && !c.checked) return toast('Please agree to face matching first.');
+  const upd = {descriptor:face.descriptor, faceThumb:face.thumb}; if (c) upd.biometricConsentAt = Date.now();
+  if (!me().avatar) upd.avatar = face.thumb;
+  await F.updateDoc(ref('users', ME), upd); closeSheet(); toast('Selfie updated.'); face = null;
+  setTimeout(() => rescanForMe(Object.keys({...C.sEvents, ...C.gEvents})), 500);
+}
+async function removeFace(){
+  if (!confirm("Remove your face data? You won't be found in new photos automatically, but you can still claim photos from Uncategorized.")) return;
+  await F.updateDoc(ref('users', ME), {descriptor:null, faceThumb:F.deleteField(), biometricConsentAt:F.deleteField()});
+  closeSheet(); toast('Face data removed.');
+}
+function otherProfile(id){
+  const u = user(id); if (!u) return;
+  if (id === ME) return tab('profile');
+  const shared = Object.values(C.groups).filter(g => g.members.includes(id));
+  openSheet(`${sheetHead(esc(fullName(u)))}
+    <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
+    ${shared.length ? `<div class="sechead">Groups Together</div><div class="list">${shared.map(g => `<button class="cell tap" onclick="closeSheet();go({name:'group',id:'${g.id}'})">${sq(g)}<div class="main"><div class="t">${esc(g.name)}</div></div><span class="chev">›</span></button>`).join('')}</div>` : ''}`);
+}
+function deviceSheet(){
+  const link = `${location.origin}${location.pathname}?login=${ME}`;
+  openSheet(`${sheetHead('Use On Another Device')}
+    <p class="hint">Open this link on your other phone or computer to sign in there. Keep it private. Anyone with it can use your account.</p>
+    <div class="linkbox">${esc(link)}</div><button class="btn tint full" onclick="copyText('${esc(link)}')">Copy Link</button>`);
+}
+async function accountsSheet(){
+  const ids = accounts().filter(id => id !== 'test');
+  for (const id of ids) if (!C.users[id]){ const s = await F.getDoc(ref('users', id)); if (s.exists()) C.users[id] = {id, ...s.data()}; else forgetAccount(id); }
+  const rows = accounts().filter(id => id !== 'test' && C.users[id]).map(id => { const u = C.users[id];
+    return `<button class="cell tap" onclick="switchTo('${id}')">${avatar(u, 40)}<div class="main"><div class="t">${esc(fullName(u))}</div><div class="s">@${esc(u.username)}</div></div>${id === ME ? '<span class="val">✓</span>' : ''}</button>`; }).join('');
+  openSheet(`${sheetHead('Switch Account')}
+    <div class="list">${rows}<button class="cell tap" onclick="${ME === 'test' ? 'closeSheet()' : 'useTestAccount()'}"><span class="sq" style="width:40px;height:40px;font-size:20px">🧪</span><div class="main"><div class="t">Test Account</div><div class="s">@test · shared for testing</div></div>${ME === 'test' ? '<span class="val">✓</span>' : ''}</button></div>
+    <div style="height:14px"></div><div class="list"><button class="cell tap blue" onclick="newAccount()">Create New Account</button></div>`);
+}
+function switchTo(id){ closeSheet(); if (id === ME) return; setMe(id); start(); }
+function signOutLocal(){ forgetAccount(ME); const next = accounts()[0] || null; setMe(next); start(); }
+async function deleteAccount(){
+  const u = me(); if (!confirm(`Delete @${u.username} and all your face data? This can't be undone.`)) return;
+  busy('Deleting Account…');
+  try {
+    const q = (c, f, op, v) => F.getDocs(F.query(col(c), F.where(f, op, v)));
+    const [ds, ns, ps, gs, es] = await Promise.all([q('deliveries', 'userId', '==', ME), q('notifications', 'userId', '==', ME), q('photos', 'matched', 'array-contains', ME), q('groups', 'members', 'array-contains', ME), q('events', 'members', 'array-contains', ME)]);
+    const ops = [];
+    ds.docs.forEach(d => ops.push(b => b.delete(d.ref))); ns.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+    ps.docs.forEach(d => ops.push(b => b.update(d.ref, {faces:d.data().faces.map(f => f.matchId === ME ? {...f, matchId:null} : f), matched:F.arrayRemove(ME)})));
+    gs.docs.concat(es.docs).forEach(d => ops.push(b => b.update(d.ref, {members:F.arrayRemove(ME)})));
+    if (ME !== 'test') ops.push(b => b.delete(ref('usernames', u.username)));
+    ops.push(b => b.delete(ref('users', ME)));
+    for (let i = 0; i < ops.length; i += 400){ const b = F.writeBatch(db); ops.slice(i, i + 400).forEach(f => f(b)); await b.commit(); }
+    closeSheet(); toast('Account and face data deleted.');
+    forgetAccount(ME); setMe(accounts()[0] || null); start();
+  } catch (e){ console.warn(e); toast("Couldn't delete everything. Try again."); }
+  busy();
+}
+
+/* ---------- screens ---------- */
+const ICONS = {
+  inbox:'<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 15.500 7 6.800A2.500 2.500 0 0 1 9.400 5h9.200a2.500 2.500 0 0 1 2.400 1.800l3 8.700v5A2.500 2.500 0 0 1 21.500 23h-15A2.500 2.500 0 0 1 4 20.500z"/><path d="M4 15.500h5.500l1.500 2.500h6l1.500-2.500H24"/></svg>',
+  photos:'<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="20" height="20" rx="4"/><circle cx="10.500" cy="10.500" r="2"/><path d="m24 18-5.500-5.500L7.500 23.500"/></svg>',
+  groups:'<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="10" r="4"/><path d="M3.500 23c.900-4.200 3.800-6.500 7.500-6.500s6.600 2.300 7.500 6.500"/><circle cx="20" cy="10.500" r="3"/><path d="M20.500 16.300c2.400.400 3.700 2.400 4.200 5.200"/></svg>',
+  profile:'<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2"><circle cx="14" cy="14" r="10.500"/><circle cx="14" cy="11.500" r="3.800"/><path d="M7 21.500c1.600-2.600 4-3.900 7-3.900s5.400 1.300 7 3.900"/></svg>',
+  bell:'<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 4a6.500 6.500 0 0 0-6.500 6.500v4.500L5 19.500h18L20.500 15v-4.500A6.500 6.500 0 0 0 14 4z"/><path d="M11.500 22.500a2.600 2.600 0 0 0 5 0"/></svg>',
+  plus:'<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2.400" stroke-linecap="round"><path d="M14 6v16M6 14h16"/></svg>',
+};
+function tabbar(){
+  const n = pending().length, b = (k, l) => `<button class="${view.name === 'tab' && view.tab === k ? 'on' : ''}" onclick="tab('${k}')">${ICONS[k]}${l}${k === 'inbox' && n ? `<span class="dot">${n}</span>` : ''}</button>`;
+  return `<nav class="tabbar">${b('inbox', 'Inbox')}${b('photos', 'Photos')}${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
+}
+function bell(){ const n = unreadCount(); return `<button class="iconbtn" onclick="go({name:'alerts'})" aria-label="Notifications">${ICONS.bell}${n ? `<span class="dot">${n}</span>` : ''}</button>`; }
+function topBar(title, right){ return `<div class="nav"><button class="back" onclick="back()">${chevron} Back</button><div class="ttl">${esc(title || '')}</div><span class="spacer"></span>${right || ''}</div>`; }
+const tileHTML = (p, list, tag) => `<button class="tile" onclick="openViewer('${p.id}',${esc(JSON.stringify(list))})"><img src="${p.thumb}" alt="" loading="lazy">${tag ? `<span class="tag">${tag}</span>` : ''}${Object.keys(p.reactions || {}).length ? `<span class="rx">${[...new Set(Object.values(p.reactions))].slice(0, 3).join('')}</span>` : ''}</button>`;
+function installCallout(){
+  if (!isIOS || standalone || localStorage.getItem('inframe_hide_install')) return '';
+  return `<div class="callout"><img src="${ICON}" alt=""><div style="flex:1"><b>Get The App</b><br>Tap the Share button, then <b>Add to Home Screen</b>. You'll get notifications and a full-screen app.</div><button class="x" onclick="localStorage.setItem('inframe_hide_install',1);render()" aria-label="Dismiss">✕</button></div>`;
+}
+function screenInbox(){
+  const items = pending().map(d => photo(d.photoId)).sort((a, b) => b.createdAt - a.createdAt), ids = items.map(p => p.id);
+  return `<div class="nav"><span class="spacer"></span>${bell()}</div><div class="large"><h1>Inbox</h1>${items.length > 1 ? `<button class="btn sm tint" onclick="keepAll()">Keep All</button>` : ''}</div>
+    <div class="content"><p class="hint">Photos your friends took that you're in.</p>
+    ${items.map(p => `<div class="card inbox"><button class="th" onclick="openViewer('${p.id}',${esc(JSON.stringify(ids))})"><img src="${p.thumb}" alt=""></button>
+      <div class="main"><div class="t">${esc(evt(p.eventId)?.name || 'Event')}</div><div class="s">From ${esc(handle(p.uploaderId))} · ${ago(p.createdAt)}</div>
+      <div class="row" style="margin-top:8px"><button class="btn sm green" onclick="decide('${p.id}','keep')">Keep</button><button class="btn sm tint" onclick="decide('${p.id}','skip')">Skip</button><button class="btn sm tint" onclick="decide('${p.id}','notme')">Not Me</button></div></div></div>`).join('')
+    || `<div class="empty"><b>All Caught Up</b>When friends upload photos you're in, they'll show up here.</div>`}</div>`;
+}
+function screenPhotos(){
+  const kept = Object.values(C.deliveries).filter(d => d.status === 'approved').map(d => photo(d.photoId)).filter(p => p && !p.loading).sort((a, b) => b.createdAt - a.createdAt);
+  let body;
+  if (!kept.length) body = `<div class="empty"><b>No Photos Yet</b>Photos you keep from your Inbox land here.</div>`;
+  else { const by = {}; kept.forEach(p => (by[p.eventId] = by[p.eventId] || []).push(p));
+    body = Object.entries(by).map(([eid, ps]) => { const e = evt(eid), ids = ps.map(p => p.id);
+      return `<div class="sechead" style="margin-left:0">${esc(e?.name || 'Event')}<span>${fmtDate(e?.date)}</span></div><div class="grid">${ps.map(p => tileHTML(p, ids)).join('')}</div>`; }).join(''); }
+  return `<div class="nav"><span class="spacer"></span>${bell()}</div><div class="large"><h1>Photos</h1></div><div class="content">${kept.length ? `<p class="hint">${plural(kept.length, 'photo')} of you.</p>` : ''}${body}</div>`;
+}
+function screenGroups(){
+  const gs = Object.values(C.groups).sort((a, b) => b.createdAt - a.createdAt);
+  const es = Object.values(C.sEvents).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return `<div class="nav"><span class="spacer"></span>${bell()}</div><div class="large"><h1>Groups</h1><button class="iconbtn" onclick="newGroupSheet()" aria-label="New Group">${ICONS.plus}</button></div>
+    <div class="content">${installCallout()}
+    <div class="sechead" style="margin-top:6px">Your Groups<button onclick="newGroupSheet()">New Group</button></div>
+    ${gs.length ? `<div class="list" style="--inset:72px">${gs.map(g => { const n = Object.values(C.gEvents).filter(e => e.groupId === g.id).length;
+      return `<button class="cell tap" onclick="go({name:'group',id:'${g.id}'})">${sq(g)}<div class="main"><div class="t">${esc(g.name)}</div><div class="s">${plural(g.members.length, 'member')} · ${plural(n, 'event')}</div></div><div class="stack">${g.members.slice(0, 3).map(id => avatar(user(id), 26)).join('')}</div><span class="chev">›</span></button>`; }).join('')}</div>`
+      : `<div class="list"><div class="cell"><div class="main s" style="white-space:normal;color:var(--muted);font-size:15px">Your regular crew, like roommates or college friends. Make events inside it whenever you go out.</div></div></div>`}
+    <div class="sechead">Single Events<button onclick="newEventSheet(null)">New Event</button></div>
+    ${es.length ? `<div class="list" style="--inset:72px">${es.map(evCell).join('')}</div>`
+      : `<div class="list"><div class="cell"><div class="main" style="color:var(--muted);font-size:15px">One-off things like a wedding or a birthday, no group needed.</div></div></div>`}</div>`;
+}
+function evCell(e){
+  const n = Object.values(C.photos).filter(p => p.eventId === e.id).length;
+  return `<button class="cell tap" onclick="go({name:'event',id:'${e.id}',seg:'mine'})">${sq(e)}<div class="main"><div class="t">${esc(e.name)}</div><div class="s">${fmtDate(e.date)} · ${plural(n, 'photo')}</div></div><span class="chev">›</span></button>`;
+}
+function membersRow(ids){ return `<div class="members">${ids.map(id => { const u = user(id); return u ? `<button class="member" onclick="otherProfile('${id}')">${avatar(u, 52, true)}<span>${id === ME ? 'You' : '@' + esc(u.username)}</span></button>` : ''; }).join('')}</div>`; }
+function screenGroup(){
+  const g = C.groups[view.id]; if (!g) return null;
+  const evs = Object.values(C.gEvents).filter(e => e.groupId === g.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return `${topBar(g.name)}<div class="hero">${sq(g, true)}<h1>${esc(g.name)}</h1><div class="s">Group · ${plural(g.members.length, 'member')}</div></div>
+    ${membersRow(g.members)}
+    <div class="content"><div class="row" style="margin-top:12px"><button class="btn fill" style="flex:1" onclick="inviteSheet('group','${g.id}')">Invite</button><button class="btn tint" style="flex:1" onclick="newEventSheet('${g.id}')">New Event</button></div>
+    <div class="sechead">Events</div>
+    ${evs.length ? `<div class="list" style="--inset:72px">${evs.map(evCell).join('')}</div>` : `<div class="list"><div class="cell"><div class="main" style="color:var(--muted);font-size:15px">No events yet. Make one for your next outing.</div></div></div>`}
+    <div style="height:28px"></div><div class="list"><button class="cell tap red" onclick="leave('group','${g.id}')">Leave Group</button></div></div>`;
+}
+function screenEvent(){
+  const e = evt(view.id); if (!e || !eventMembers(e).includes(ME)) return null;
+  const g = e.groupId ? C.groups[e.groupId] : null, all = Object.values(C.photos).filter(p => p.eventId === e.id).sort((a, b) => b.createdAt - a.createdAt);
+  const mine = all.filter(p => { const d = myDel(p.id); return d && d.status !== 'declined'; }), uncat = uncatFor(e.id), ups = all.filter(p => p.uploaderId === ME);
+  const seg = view.seg || 'mine', list = seg === 'uncat' ? uncat : seg === 'uploads' ? ups : mine, ids = list.map(p => p.id);
+  const sb = (k, l, n) => `<button class="${seg === k ? 'on' : ''}" onclick="view.seg='${k}';render()">${l} (${n})</button>`;
+  const tag = p => { if (seg === 'uploads'){ const m = p.faces.filter(f => f.matchId).length; return p.faces.length ? `${m}/${p.faces.length} Matched` : 'No Faces'; } if (seg === 'mine' && myDel(p.id)?.status === 'pending') return 'Review'; return ''; };
+  const empty = {mine:'<b>None Yet</b>When friends upload photos you\'re in, they\'ll show up here.', uncat:'<b>Nothing Here</b>Photos with faces nobody matched, or no faces at all, land here so anyone can claim them.', uploads:'<b>No Uploads</b>Tap Upload Photos to share yours.'}[seg];
+  return `${topBar(e.name, `<button class="iconbtn" onclick="inviteSheet('${g ? 'group' : 'event'}','${g ? g.id : e.id}')" aria-label="Invite" style="font-size:17px">Invite</button>`)}
+    <div class="hero">${sq(e, true)}<h1>${esc(e.name)}</h1><div class="s">${fmtDate(e.date)} · ${g ? esc(g.name) : 'Single Event'}</div></div>
+    ${membersRow(eventMembers(e))}
+    <div class="content"><label class="btn fill full" style="margin-top:12px">Upload Photos<input type="file" accept="image/*" multiple hidden onchange="upload('${e.id}',this.files)"></label>
+    ${me()?.descriptor ? '' : `<div class="callout" style="margin-top:12px"><div style="flex:1">You don't have a face selfie yet, so photos of you won't be found automatically. <a href="#" onclick="faceSheet();return false" style="color:var(--accent)">Add Selfie</a></div></div>`}
+    <div class="seg">${sb('mine', 'Of Me', mine.length)}${sb('uncat', 'Uncategorized', uncat.length)}${sb('uploads', 'My Uploads', ups.length)}</div>
+    ${list.length ? `<div class="grid">${list.map(p => tileHTML(p, ids, tag(p))).join('')}</div>` : `<div class="empty">${empty}</div>`}
+    ${g ? '' : `<div style="height:28px"></div><div class="list"><button class="cell tap red" onclick="leave('event','${e.id}')">Leave Event</button></div>`}</div>`;
+}
+function screenAlerts(){
+  const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+  return `${topBar('Notifications')}<div class="large"><h1>Notifications</h1></div><div class="content">
+    ${perm !== 'granted' ? `<div class="callout"><img src="${ICON}" alt=""><div style="flex:1">Get a buzz when someone shares a photo of you.<br><button class="btn sm fill" style="margin-top:8px" onclick="enableNotifications()">Turn On Notifications</button></div></div>` : ''}
+    ${C.notifs.length ? `<div class="list" style="--inset:64px">${C.notifs.slice(0, 60).map(n => `<button class="cell tap notif ${n.read ? '' : 'unread'}" onclick='openLink(${JSON.stringify(n.link || null)})'>${avatar(user(n.fromId), 36)}<div class="main"><div class="t" style="white-space:normal">${esc(n.text)}</div></div><span class="when">${ago(n.at)}</span>${n.read ? '' : '<span class="udot"></span>'}</button>`).join('')}</div>`
+      : `<div class="empty"><b>No Notifications</b>You'll hear about new photos, joins and reactions here.</div>`}</div>`;
+}
+function screenProfile(){
+  const u = me(), photosOfMe = Object.values(C.deliveries).filter(d => d.status === 'approved').length, ups = Object.values(C.photos).filter(p => p.uploaderId === ME).length;
+  const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+  return `<div class="nav"><span class="spacer"></span>${bell()}</div>
+    <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
+    <div class="content"><div class="stats"><div><b>${photosOfMe}</b><span>Photos Of Me</span></div><div><b>${ups}</b><span>Uploads</span></div><div><b>${Object.keys(C.groups).length}</b><span>Groups</span></div></div>
+    <div style="height:24px"></div>
+    <div class="list"><button class="cell tap" onclick="editProfileSheet()"><div class="main">Edit Profile</div><span class="chev">›</span></button>
+      <button class="cell tap" onclick="faceSheet()"><div class="main">Face Match Selfie</div><span class="val">${u.descriptor ? 'On' : 'Not Set'}</span><span class="chev">›</span></button>
+      <button class="cell tap" onclick="${perm === 'granted' ? "toast('Notifications are on. Turn them off in your phone\\'s Settings.')" : 'enableNotifications()'}"><div class="main">Notifications</div><span class="val">${perm === 'granted' ? 'On' : 'Off'}</span><span class="chev">›</span></button></div>
+    <div style="height:24px"></div>
+    <div class="list"><button class="cell tap" onclick="deviceSheet()"><div class="main">Use On Another Device</div><span class="chev">›</span></button>
+      <button class="cell tap" onclick="accountsSheet()"><div class="main">Switch Account</div><span class="chev">›</span></button>
+      <a class="cell tap" href="terms.html" target="_blank" style="color:inherit;text-decoration:none"><div class="main">Terms & Privacy</div><span class="chev">›</span></a></div>
+    <div style="height:24px"></div>
+    <div class="list"><button class="cell tap red" onclick="deleteAccount()">Delete Account</button></div>
+    <p class="hint" style="text-align:center;margin-top:20px;font-size:13px">InFrame · Prototype</p></div>`;
+}
+function render(){
+  if (!F) return;
+  if (!ME){ if (!$('#signup')) renderSignup(); return; }
+  if (!me()){ $('#app').innerHTML = '<div class="loading">Loading…</div>'; return; }
+  let html = null;
+  if (view.name === 'tab') html = ({inbox:screenInbox, photos:screenPhotos, groups:screenGroups, profile:screenProfile}[view.tab] || screenGroups)();
+  else if (view.name === 'group') html = screenGroup();
+  else if (view.name === 'event') html = screenEvent();
+  else if (view.name === 'alerts') html = screenAlerts();
+  if (html == null){ if (dyn.photos && Date.now() - (view.at || 0) > 5000){ stack = []; view = {name:'tab', tab:'groups'}; html = screenGroups(); } else html = '<div class="loading">Loading…</div>'; }
+  $('#app').innerHTML = html + tabbar();
+  if (document.querySelector('#viewer.show')) drawViewer();
+}
+
+/* ---------- start ---------- */
+function start(){ stopAll(); stack = []; view = {name:'tab', tab:'groups'}; if (ME){ subscribeAll(); setTimeout(maybeJoin, 300); } else { su = {step:1, first:'', last:'', username:''}; } $('#app').innerHTML = ''; render(); }
+(async () => {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!FB_CONFIG){ $('#app').innerHTML = '<div class="empty" style="padding-top:30vh"><b>Almost Ready</b>The InFrame database is still being set up.</div>'; return; }
+  try { await initFirebase(); } catch (e){ $('#app').innerHTML = '<div class="empty" style="padding-top:30vh"><b>Can\'t Connect</b>Check your internet connection and reopen InFrame.</div>'; return; }
+  const p = new URLSearchParams(location.search);
+  if (p.get('join')) sessionStorage.setItem('inframe_join', p.get('join'));
+  if (p.get('login')){ const s = await F.getDoc(ref('users', p.get('login'))); if (s.exists()){ setMe(s.id); toast(`Signed in as @${s.data().username}.`); } else toast("That sign-in link isn't valid."); }
+  if (p.toString()) history.replaceState(null, '', location.pathname);
+  if (ME){ try { const s = await F.getDoc(ref('users', ME)); if (!s.exists()){ forgetAccount(ME); setMe(accounts()[0] || null); } } catch {} }
+  start();
+})();
+</script>
+</body>
+</html>
