@@ -24,6 +24,14 @@ service cloud.firestore {
         && (request.resource.data.userId == request.auth.uid || isAdmin());
       allow delete: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
+    // username log-in records: email encrypted with the owner's password; readable one at a time, never listable
+    match /inframe_logins/{name} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid
+        && get(/databases/$(database)/documents/inframe_usernames/$(name)).data.userId == request.auth.uid;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
     match /inframe_groups/{id} { allow read, write: if signedIn(); }
     match /inframe_events/{id} { allow read, write: if signedIn(); }
     match /inframe_photos/{id} { allow read, write: if signedIn(); }
