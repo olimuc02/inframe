@@ -1,32 +1,35 @@
 rules_version = '2';
-// InFrame prototype rules: only InFrame's own collections are reachable, with basic shape checks.
-// The admin account (users doc id "admin_<uid>", isAdmin: true) can only be created or changed by
-// someone signed in with Google as the admin email. Regular members don't sign in yet.
-// Before a wide public launch, add sign-in for everyone and tie writes to the signed-in user.
+// InFrame rules: you must be logged in (Firebase Authentication) to read or change anything.
+// Profiles can only be created/edited by their owner. The admin profile ("admin_<uid>", isAdmin: true)
+// can only be created or changed by someone signed in with Google as the admin email.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
     function isAdmin() {
       return request.auth != null
         && request.auth.token.email == 'muckadigital@gmail.com'
         && request.auth.token.email_verified == true;
     }
     match /inframe_users/{id} {
-      allow read: if true;
-      allow delete: if !id.matches('admin_.*') || isAdmin();
-      allow create, update: if request.resource.data.username is string
+      allow read: if signedIn();
+      allow delete: if signedIn() && (id == request.auth.uid || isAdmin());
+      allow create, update: if signedIn()
+        && request.resource.data.username is string
         && request.resource.data.first is string && request.resource.data.first.size() <= 40
-        && ((!id.matches('admin_.*') && request.resource.data.get('isAdmin', false) == false) || isAdmin());
+        && ((id == request.auth.uid && request.resource.data.get('isAdmin', false) == false) || isAdmin());
     }
     match /inframe_usernames/{name} {
-      allow read, delete: if true;
-      allow create, update: if name.matches('^[a-z0-9._]{3,20}$') && request.resource.data.userId is string;
+      allow read: if signedIn();
+      allow create, update: if signedIn() && name.matches('^[a-z0-9._]{3,20}$')
+        && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
-    match /inframe_groups/{id} { allow read, write: if true; }
-    match /inframe_events/{id} { allow read, write: if true; }
-    match /inframe_photos/{id} { allow read, write: if true; }
-    match /inframe_images/{id} { allow read, write: if true; }
-    match /inframe_deliveries/{id} { allow read, write: if true; }
-    match /inframe_notifications/{id} { allow read, write: if true; }
-    match /inframe_requests/{id} { allow read, write: if true; }
+    match /inframe_groups/{id} { allow read, write: if signedIn(); }
+    match /inframe_events/{id} { allow read, write: if signedIn(); }
+    match /inframe_photos/{id} { allow read, write: if signedIn(); }
+    match /inframe_images/{id} { allow read, write: if signedIn(); }
+    match /inframe_deliveries/{id} { allow read, write: if signedIn(); }
+    match /inframe_notifications/{id} { allow read, write: if signedIn(); }
+    match /inframe_requests/{id} { allow read, write: if signedIn(); }
   }
 }

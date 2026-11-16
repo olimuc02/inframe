@@ -233,6 +233,36 @@ button{cursor:pointer}
   #toast{bottom:36px}
   .vwrap img{max-width:calc(100vw - 140px)}
 }
+/* welcome & sign-in */
+.back.plain{border:0;background:none;color:var(--accent);font-size:17px;display:flex;align-items:center;gap:4px;padding:4px 0;margin-bottom:6px;align-self:flex-start}
+.back.plain svg{width:12px;height:19px}
+.or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:14px;margin:16px 0}
+.or::before,.or::after{content:"";flex:1;border-top:.5px solid var(--sep)}
+.gbtn{background:var(--card);color:var(--ink);gap:10px;box-shadow:inset 0 0 0 .5px var(--sep)}
+.welcome{max-width:1040px;margin:0 auto;min-height:100vh;min-height:100dvh;padding:calc(var(--sat) + 36px) 22px calc(var(--sab) + 28px);display:flex;flex-direction:column;gap:28px}
+.welcome .logo{width:84px;height:84px;border-radius:20px;display:block;margin:0 auto 14px;box-shadow:0 8px 24px rgba(88,86,214,.32)}
+.welcome h1{font-size:38px;text-align:center;margin:0;letter-spacing:-.01em}
+.wl-tag{text-align:center;color:var(--muted);font-size:19px;margin:8px auto 22px;max-width:360px;line-height:1.35}
+.wl-cta{display:flex;flex-direction:column;gap:10px;max-width:400px;margin:0 auto}
+.wl-terms{display:block;text-align:center;color:var(--muted);font-size:13px;margin-top:14px}
+.wl-right{background:var(--card);border-radius:20px;padding:22px 20px}
+.wl-h{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;margin-bottom:6px}
+.wl-step{display:flex;gap:14px;align-items:flex-start;padding:12px 0}
+.wl-step+.wl-step{border-top:.5px solid var(--sep)}
+.wl-ic{width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}
+.wl-ic svg{width:26px;height:26px}
+.wl-step b{font-size:17px}
+.wl-step p{margin:3px 0 0;color:var(--muted);font-size:15px;line-height:1.4}
+.wl-safe{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:14px;background:var(--bg);border-radius:14px;color:var(--muted);font-size:14px}
+.wl-safe svg{width:22px;height:22px;flex:none;color:var(--green)}
+.wl-safe p{margin:0;line-height:1.4}
+@media (min-width:900px){
+  .welcome{flex-direction:row;align-items:center;gap:56px;padding-top:40px}
+  .wl-left{flex:1}
+  .wl-right{flex:1.1;padding:28px}
+  .welcome h1{font-size:52px}
+  .wl-tag{font-size:21px;max-width:420px}
+}
 .asbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 64px);z-index:11;background:var(--orange);color:#fff;font-size:14px;font-weight:600;padding:7px 8px 7px 16px;border-radius:99px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);white-space:nowrap}
 .asbar button{border:0;background:rgba(255,255,255,.25);color:#fff;font-weight:600;font-size:13px;padding:5px 11px;border-radius:99px}
 .linkbox{background:var(--card);border-radius:12px;padding:14px;font-size:14px;word-break:break-all;color:var(--muted);margin-bottom:12px;user-select:all;-webkit-user-select:all}
@@ -282,11 +312,9 @@ const standalone = matchMedia('(display-mode: standalone)').matches || navigator
 const chevron = '<svg viewBox="0 0 13 21" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2 2.5 10.5 11 19"/></svg>';
 
 /* ---------- local device memory ---------- */
-let ME = localStorage.getItem('inframe_me') || null;
-function accounts(){ try { return JSON.parse(localStorage.getItem('inframe_accounts') || '[]'); } catch { return []; } }
-function rememberAccount(id){ const a = accounts().filter(x => x !== id); a.unshift(id); localStorage.setItem('inframe_accounts', JSON.stringify(a)); }
-function forgetAccount(id){ localStorage.setItem('inframe_accounts', JSON.stringify(accounts().filter(x => x !== id))); }
-function setMe(id, remember = true){ ME = id; if (id){ localStorage.setItem('inframe_me', id); if (remember) rememberAccount(id); } else localStorage.removeItem('inframe_me'); }
+// ME = the profile being used: the signed-in person's Firebase id (admin uses "admin_<id>").
+let ME = null;
+function setMe(id){ ME = id; }
 
 /* ---------- Firebase ---------- */
 let F = null, db = null, A = null, AUTH = null;
@@ -306,7 +334,7 @@ async function initFirebase(){
     AUTH = au.getAuth(a);
     // Never let a slow or blocked sign-in check hold up the app.
     await Promise.race([new Promise(r => { const off = au.onAuthStateChanged(AUTH, () => { off(); r(); }); }), new Promise(r => setTimeout(r, 4000))]);
-    au.onAuthStateChanged(AUTH, () => later());
+    au.onAuthStateChanged(AUTH, u => { if (booted && (u?.uid || null) !== routedUid) routeAuth(); });
   } catch (e){ console.warn('auth unavailable', e); AUTH = null; }
 }
 
@@ -319,7 +347,7 @@ async function adminSignIn(){
     const prov = new A.GoogleAuthProvider(); prov.setCustomParameters({login_hint:ADMIN_EMAIL, prompt:'select_account'});
     const res = await A.signInWithPopup(AUTH, prov);
     if (res.user.email !== ADMIN_EMAIL){ await A.signOut(AUTH); return toast("That Google account isn't the InFrame admin."); }
-    closeSheet(); await finishAdmin(res.user); toast('Signed in as admin.');
+    closeSheet(); adminEntry = false; await routeAuth(); toast('Signed in as admin.');
   } catch (e){
     console.warn(e);
     const m = {'auth/popup-closed-by-user':'Sign-in cancelled.', 'auth/cancelled-popup-request':'Sign-in cancelled.', 'auth/unauthorized-domain':"Admin sign-in isn't switched on for this website yet.", 'auth/operation-not-allowed':"Google sign-in isn't turned on in Firebase yet.", 'auth/popup-blocked':'Allow pop-ups for this site, then try again.'}[e?.code];
@@ -336,20 +364,115 @@ async function finishAdmin(authUser){
     const now = Date.now();
     await F.setDoc(r, {isAdmin:true, first:'Oliver', last:'M', username:username || 'oliver', avatar:'', emoji:'', bio:'', descriptor:null, termsVersion:TERMS_VERSION, termsAcceptedAt:now, createdAt:now});
   }
-  adminEntry = false; prevMe = null; localStorage.removeItem('inframe_admin_return'); setMe(id); start();
+  adminEntry = false;
+  setMe(localStorage.getItem('inframe_viewas') || id); start();
 }
-async function adminSignOut(){ await A.signOut(AUTH); forgetAccount(ME); setMe(accounts().find(id => !isAdminId(id)) || null); start(); toast('Signed out of admin.'); }
-function viewAs(id){ localStorage.setItem('inframe_admin_return', ME); closeSheet(); setMe(id, false); start(); toast(`Viewing as ${handle(id)}.`); }
-function backToAdmin(){ const id = localStorage.getItem('inframe_admin_return'); localStorage.removeItem('inframe_admin_return'); setMe(id); start(); }
+const adminProfileId = () => AUTH?.currentUser ? 'admin_' + AUTH.currentUser.uid : null;
+function viewAs(id){ localStorage.setItem('inframe_viewas', id); closeSheet(); setMe(id); start(); toast(`Viewing as ${handle(id)}.`); }
+function backToAdmin(){ localStorage.removeItem('inframe_viewas'); setMe(adminProfileId()); start(); }
 function adminGate(){
   return `<div class="onb" id="admingate"><img class="logo" src="icon-192.png" alt=""><h1>InFrame Admin</h1><p class="hint">Only ${esc(ADMIN_EMAIL)} can open the admin account.</p>
     <div class="grow"></div><button class="btn fill full" onclick="adminSignIn()">Sign In With Google</button>
     <button class="link" onclick="leaveAdminGate()">Go To The App Instead</button></div>`;
 }
-function leaveAdminGate(){
-  adminEntry = false;
-  if (isAdminId(ME)){ forgetAccount(ME); setMe(accounts().find(id => !isAdminId(id)) || null); }
-  start();
+function leaveAdminGate(){ adminEntry = false; $('#app').innerHTML = ''; render(); }
+
+/* ---------- signing in (Firebase Authentication) ---------- */
+let booted = false, routedUid, authScreen = 'welcome';
+// Decide which profile to open for whoever is signed in.
+async function routeAuth(){
+  const u = AUTH?.currentUser; routedUid = u?.uid || null;
+  if (!u){ setMe(null); localStorage.removeItem('inframe_viewas'); authScreen = 'welcome'; return start(); }
+  if (u.email === ADMIN_EMAIL && u.providerData.some(p => p.providerId === 'google.com')){
+    try { return await finishAdmin(u); } catch (e){ console.warn(e); }
+  }
+  let s = null; try { s = await F.getDoc(ref('users', u.uid)); } catch (e){ console.warn(e); }
+  if (s?.exists()){ setMe(u.uid); start(); }
+  else { stopAll(); setMe(null); su = {step:1, first:'', last:'', username:''}; $('#app').innerHTML = ''; renderSignup(); } // signed in, profile not made yet
+}
+const AUTH_ERRORS = {
+  'auth/invalid-credential':'Email or password is incorrect.', 'auth/wrong-password':'Email or password is incorrect.', 'auth/user-not-found':'Email or password is incorrect.',
+  'auth/invalid-email':"That email address doesn't look right.", 'auth/missing-password':'Enter your password.',
+  'auth/email-already-in-use':'There is already an account with that email. Try Log In.', 'auth/weak-password':'Use a password with at least 8 characters.',
+  'auth/too-many-requests':'Too many tries. Wait a minute and try again.', 'auth/network-request-failed':'No connection. Check your internet and try again.',
+  'auth/operation-not-allowed':"That sign-in method isn't switched on yet.", 'auth/popup-closed-by-user':'Sign-in cancelled.', 'auth/cancelled-popup-request':'Sign-in cancelled.',
+  'auth/popup-blocked':'Allow pop-ups for this site, then try again.', 'auth/unauthorized-domain':"Sign-in isn't switched on for this website yet.",
+};
+const authErr = e => { console.warn(e); toast(AUTH_ERRORS[e?.code] || 'Something went wrong. Try again.'); };
+function showAuth(s){ authScreen = s; $('#app').innerHTML = ''; render(); window.scrollTo(0, 0); }
+async function doLogin(){
+  const email = $('#au-email').value.trim(), pw = $('#au-pw').value;
+  if (!email) return toast('Enter your email.');
+  const b = $('#au-go'); b.disabled = true;
+  try { await A.signInWithEmailAndPassword(AUTH, email, pw); } catch (e){ authErr(e); } b.disabled = false;
+}
+async function doRegister(){
+  const email = $('#au-email').value.trim(), pw = $('#au-pw').value;
+  if (!email) return toast('Enter your email.');
+  if (pw.length < 8) return toast('Use a password with at least 8 characters.');
+  const b = $('#au-go'); b.disabled = true;
+  try { await A.createUserWithEmailAndPassword(AUTH, email, pw); } catch (e){ authErr(e); } b.disabled = false;
+}
+async function doGoogle(){ try { await A.signInWithPopup(AUTH, new A.GoogleAuthProvider()); } catch (e){ authErr(e); } }
+async function doReset(){
+  const email = $('#au-email').value.trim(); if (!email) return toast('Enter your email first.');
+  try { await A.sendPasswordResetEmail(AUTH, email); toast('Check your email for a link to reset your password.'); showAuth('login'); } catch (e){ authErr(e); }
+}
+async function logOut(){ closeSheet(); localStorage.removeItem('inframe_viewas'); try { await A.signOut(AUTH); } catch {} routeAuth(); toast('Logged out.'); }
+const STEP_ICONS = [
+  '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="10" r="4"/><path d="M3.500 23c.900-4.200 3.800-6.500 7.500-6.500s6.600 2.300 7.500 6.500"/><path d="M21 8v8M17 12h8"/></svg>',
+  '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="20" height="16" rx="3"/><path d="M14 18v-7M10.500 14.500 14 11l3.500 3.500"/></svg>',
+  '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9.500V6.500A2.500 2.500 0 0 1 6.500 4h3M18.500 4h3A2.500 2.500 0 0 1 24 6.500v3M24 18.500v3a2.500 2.500 0 0 1-2.500 2.500h-3M9.500 24h-3A2.500 2.500 0 0 1 4 21.500v-3"/><circle cx="14" cy="12" r="3"/><path d="M8.500 20c1.200-2.600 3.100-3.800 5.500-3.800s4.300 1.200 5.500 3.800"/></svg>',
+  '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 23.500S4 17.800 4 10.800A5.300 5.300 0 0 1 14 8.300a5.300 5.300 0 0 1 10 2.500c0 7-10 12.700-10 12.700z"/></svg>',
+];
+function renderAuth(){
+  const invited = sessionStorage.getItem('inframe_join') ? `<div class="callout" style="text-align:left"><img src="${ICON}" alt=""><div>You've been invited to share photos on InFrame. Create an account or log in to join.</div></div>` : '';
+  const google = `<div class="or"><span>or</span></div><button class="btn full gbtn" onclick="doGoogle()"><svg viewBox="0 0 48 48" width="20" height="20"><path fill="#FFC107" d="M43.600 20.500H42V20H24v8h11.300C33.700 32.700 29.200 36 24 36c-6.600 0-12-5.400-12-12s5.400-12 12-12c3.100 0 5.800 1.200 7.900 3.100l5.700-5.700C34 6.100 29.300 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.300-.100-2.400-.400-3.500z"/><path fill="#FF3D00" d="m6.300 14.700 6.600 4.800C14.700 15.100 19 12 24 12c3.100 0 5.800 1.200 7.900 3.100l5.700-5.700C34 6.100 29.300 4 24 4 16.300 4 9.700 8.300 6.300 14.700z"/><path fill="#4CAF50" d="M24 44c5.200 0 9.900-2 13.400-5.200l-6.200-5.200C29.200 35.100 26.700 36 24 36c-5.200 0-9.600-3.300-11.300-8l-6.500 5C9.500 39.600 16.200 44 24 44z"/><path fill="#1976D2" d="M43.600 20.500H42V20H24v8h11.300c-.800 2.200-2.200 4.200-4.100 5.600l6.200 5.200C37 39.200 44 34 44 24c0-1.300-.100-2.400-.400-3.500z"/></svg>Continue With Google</button>`;
+  const fields = (pwPlaceholder, auto) => `<div class="field">
+      <label><span>Email</span><input id="au-email" type="email" autocomplete="email" autocapitalize="none" placeholder="you@email.com"></label>
+      <label><span>Password</span><input id="au-pw" type="password" autocomplete="${auto}" placeholder="${pwPlaceholder}" onkeydown="if(event.key==='Enter')$('#au-go').click()"></label></div>`;
+  let html;
+  if (authScreen === 'login') html = `<div class="onb" id="auth">
+    <button class="back plain" onclick="showAuth('welcome')">${chevron} Back</button>
+    <img class="logo" src="icon-192.png" alt=""><h1>Welcome Back</h1><p class="hint">Log in to see the photos you're in.</p>${invited}
+    ${fields('Your password', 'current-password')}
+    <button class="link" style="margin:-4px 0 10px auto;padding:4px" onclick="showAuth('reset')">Forgot Password?</button>
+    <button class="btn fill full" id="au-go" onclick="doLogin()">Log In</button>${google}
+    <div class="grow"></div><p class="hint" style="margin-top:22px">New to InFrame? <a href="#" onclick="showAuth('signup');return false" style="color:var(--accent)">Create Account</a></p></div>`;
+  else if (authScreen === 'signup') html = `<div class="onb" id="auth">
+    <button class="back plain" onclick="showAuth('welcome')">${chevron} Back</button>
+    <img class="logo" src="icon-192.png" alt=""><h1>Create Account</h1><p class="hint">Start with your email. You'll set up your profile and selfie next.</p>${invited}
+    ${fields('At least 8 characters', 'new-password')}
+    <button class="btn fill full" id="au-go" onclick="doRegister()">Continue</button>${google}
+    <div class="grow"></div><p class="hint" style="margin-top:22px">Already have an account? <a href="#" onclick="showAuth('login');return false" style="color:var(--accent)">Log In</a></p></div>`;
+  else if (authScreen === 'reset') html = `<div class="onb" id="auth">
+    <button class="back plain" onclick="showAuth('login')">${chevron} Back</button>
+    <h1 style="margin-top:20px">Reset Password</h1><p class="hint">Enter your email and we'll send you a link to choose a new password.</p>
+    <div class="field"><label><span>Email</span><input id="au-email" type="email" autocomplete="email" autocapitalize="none" placeholder="you@email.com"></label></div>
+    <button class="btn fill full" onclick="doReset()">Send Reset Link</button></div>`;
+  else html = `<div class="welcome" id="auth">
+    <div class="wl-left">
+      <img class="logo" src="icon-192.png" alt="">
+      <h1>InFrame</h1>
+      <p class="wl-tag">The group photo app that sends every picture to the people in it.</p>
+      ${invited}
+      <div class="wl-cta">
+        <button class="btn fill full" onclick="showAuth('signup')">Create Account</button>
+        <button class="btn tint full" onclick="showAuth('login')">Log In</button>
+      </div>
+      <a class="wl-terms" href="terms.html" target="_blank">Terms & Privacy</a>
+    </div>
+    <div class="wl-right">
+      <div class="wl-h">How It Works</div>
+      ${[['Start A Group Or Event', 'Make a group for your crew, or a one-off event like a wedding or a trip. Invite friends with a link.'],
+         ['Everyone Uploads', 'After the night out, everyone adds the photos from their phone. No more begging in the group chat.'],
+         ['InFrame Finds You', 'Using the selfie you sign up with, InFrame spots who is in each photo and sends it to them.'],
+         ['Keep What You Love', "Photos of you land in your Inbox. Keep them, skip them, or request more from friends who haven't shared yet."]]
+        .map(([t, d], i) => `<div class="wl-step"><span class="wl-ic">${STEP_ICONS[i]}</span><div><b>${t}</b><p>${d}</p></div></div>`).join('')}
+      <div class="wl-safe"><svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="12" width="16" height="12" rx="3"/><path d="M10 12V9a4 4 0 0 1 8 0v3"/></svg>
+        <p>Your face data is only used to find you in your own groups' photos. It's never sold, never shown to anyone, and you can delete it anytime.</p></div>
+    </div></div>`;
+  $('#app').innerHTML = html;
 }
 
 /* admin panel data: one-time loads of everything, refreshed on demand */
@@ -476,7 +599,7 @@ function watchUsers(ids){
     if (!id || userSubs[id]) return;
     userSubs[id] = F.onSnapshot(ref('users', id), s => {
       if (s.exists()) C.users[id] = {id, ...s.data()}; else delete C.users[id];
-      if (id === ME && !s.exists() && !s.metadata.fromCache){ signOutLocal(); return; }
+      if (id === ME && !s.exists() && !s.metadata.fromCache){ localStorage.removeItem('inframe_viewas'); routedUid = undefined; routeAuth(); return; }
       later();
     }, syncErr);
   });
@@ -701,7 +824,7 @@ function renderSignup(){
   let body = '';
   if (su.step === 1) body = `
     <img class="logo" src="icon-192.png" alt="">
-    <h1>InFrame</h1><p class="hint">${su.admin ? 'Set up your admin profile. You can use the app like everyone else, plus the Admin panel.' : "Snap together. Everyone gets the photos they're in."}</p>
+    <h1>Your Profile</h1><p class="hint">Tell your friends who you are.</p>
     ${inviteBannerHTML()}${steps}
     <div class="field">
       <label><span>First Name</span><input id="su-first" value="${esc(su.first)}" autocomplete="given-name" placeholder="Required"></label>
@@ -711,7 +834,7 @@ function renderSignup(){
     <div class="fnote">Friends see your first name, last initial and username.</div>
     <div class="grow"></div>
     <button class="btn fill full" onclick="suNext1()">Continue</button>
-    ${prevMe ? `<button class="link" onclick="cancelNewAccount()">Back To My Account</button>` : ''}`;
+    <button class="link" onclick="logOut()">Log Out</button>`;
   if (su.step === 2) body = `
     <h1>Face Match Selfie</h1><p class="hint">This is how InFrame finds you in your friends' photos. It's only used for matching and is never posted.</p>${steps}
     <div class="box" id="facebox">${face ? `<img class="facecirc" src="${face.thumb}" alt=""><div class="okmsg">Face Found</div><button class="btn sm tint" onclick="face=null;$('#facebox').innerHTML=faceButtons()">Retake</button>` : faceButtons()}</div>
@@ -720,7 +843,7 @@ function renderSignup(){
     <button class="btn fill full" onclick="suNext2()">Continue</button>
     <button class="link" onclick="su.step=1;renderSignup()">Back</button>`;
   if (su.step === 3) body = `
-    <h1>Your Profile</h1><p class="hint">Pick a profile picture and an emoji that's you.</p>${steps}
+    <h1>Your Look</h1><p class="hint">Pick a profile picture and an emoji that's you.</p>${steps}
     ${avatarPicker(pickedAvatar || face.thumb, 'face.thumb')}
     <div class="sechead" style="margin-top:0">Your Emoji</div>${emojiGrid(pickedEmoji)}
     <div class="field"><label><span>Bio</span><input id="su-bioline" maxlength="80" placeholder="Optional"></label></div>
@@ -748,25 +871,22 @@ function suNext2(){
 async function suCreate(){
   if (!$('#su-terms').checked) return toast('Please agree to the Terms to continue.');
   const btn = $('#su-go'); btn.disabled = true;
-  if (su.admin && !adminAuthed()){ btn.disabled = false; return adminSignIn(); }
-  const id = su.admin || uid();
+  if (!AUTH?.currentUser){ btn.disabled = false; return showAuth('signup'); }
+  const id = AUTH.currentUser.uid;
   try {
     await claimUsername(su.username, id);
     const now = Date.now();
     await F.setDoc(ref('users', id), {
-      isAdmin:!!su.admin,
+      isAdmin:false,
       first:su.first[0].toUpperCase() + su.first.slice(1), last:su.last, username:su.username,
       avatar:pickedAvatar || face.thumb, emoji:pickedEmoji, bio:$('#su-bioline').value.trim(),
       faceThumb:face.thumb, descriptor:face.descriptor,
       termsVersion:TERMS_VERSION, termsAcceptedAt:now, biometricConsentAt:su.bioConsent, createdAt:now,
     });
-    face = null; pickedAvatar = null; pickedEmoji = ''; su = {step:1, first:'', last:'', username:''}; prevMe = null;
+    face = null; pickedAvatar = null; pickedEmoji = ''; su = {step:1, first:'', last:'', username:''};
     setMe(id); start(); toast('Welcome to InFrame!');
   } catch (e){ btn.disabled = false; toast(typeof e === 'string' ? e : 'Something went wrong. Try again.'); if (e === 'That username is taken.'){ su.step = 1; renderSignup(); } }
 }
-let prevMe = null;
-function newAccount(){ prevMe = ME; closeSheet(); stopAll(); setMe(null); su = {step:1, first:'', last:'', username:''}; renderSignup(); }
-function cancelNewAccount(){ const id = prevMe; prevMe = null; setMe(id); start(); }
 
 /* ---------- navigation ---------- */
 let view = {name:'tab', tab:'groups'}, stack = [];
@@ -1102,32 +1222,15 @@ function otherProfile(id){
     <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
     ${shared.length ? `<div class="sechead">Groups Together</div><div class="list">${shared.map(g => `<button class="cell tap" onclick="closeSheet();go({name:'group',id:'${g.id}'})">${sq(g)}<div class="main"><div class="t">${esc(g.name)}</div></div><span class="chev">›</span></button>`).join('')}</div>` : ''}`);
 }
-function deviceSheet(){
-  if (isAdminId(ME)) return openSheet(`${sheetHead('Use On Another Device')}<p class="hint">On your other device, open your private admin link and sign in with Google:</p><div class="linkbox">${esc(location.origin + location.pathname)}admin/</div><button class="btn tint full" onclick="copyText('${esc(location.origin + location.pathname)}admin/')">Copy Admin Link</button>`);
-  const link = `${location.origin}${location.pathname}?login=${ME}`;
-  openSheet(`${sheetHead('Use On Another Device')}
-    <p class="hint">Open this link on your other phone or computer to sign in there. Keep it private. Anyone with it can use your account.</p>
-    <div class="linkbox">${esc(link)}</div><button class="btn tint full" onclick="copyText('${esc(link)}')">Copy Link</button>`);
-}
-async function accountsSheet(){
-  for (const id of accounts()) if (!C.users[id]){ const s = await F.getDoc(ref('users', id)); if (s.exists()) C.users[id] = {id, ...s.data()}; else forgetAccount(id); }
-  const rows = accounts().filter(id => C.users[id]).map(id => { const u = C.users[id];
-    return `<button class="cell tap" onclick="switchTo('${id}')">${avatar(u, 40)}<div class="main"><div class="t">${esc(fullName(u))}${isAdminId(id) ? ' · Admin' : ''}</div><div class="s">@${esc(u.username)}</div></div>${id === ME ? '<span class="val">✓</span>' : ''}</button>`; }).join('');
-  openSheet(`${sheetHead('Switch Account')}
-    ${rows ? `<div class="list">${rows}</div><div style="height:14px"></div>` : ''}
-    <div class="list"><button class="cell tap blue" onclick="newAccount()">Create New Account</button>
-      ${isAdminId(ME) ? `<button class="cell tap red" onclick="closeSheet();adminSignOut()">Sign Out Of Admin</button>` : ''}</div>`);
-}
-function switchTo(id){ closeSheet(); if (id === ME) return; localStorage.removeItem('inframe_admin_return'); setMe(id); start(); }
-function signOutLocal(){ forgetAccount(ME); const next = accounts()[0] || null; setMe(next); start(); }
 async function deleteAccount(){
   const u = me(); if (!confirm(`Delete @${u.username} and all your face data? This can't be undone.`)) return;
   busy('Deleting Account…');
   try {
     await deleteUserData(ME, u.username);
-    if (isAdminId(ME)) await A.signOut(AUTH);
-    closeSheet(); toast('Account and face data deleted.');
-    forgetAccount(ME); setMe(accounts()[0] || null); start();
+    // Remove the login too; if it was signed in long ago Firebase asks for a fresh login first, so just sign out.
+    if (!isAdminId(ME)) { try { await A.deleteUser(AUTH.currentUser); } catch (e){ console.warn(e); } }
+    try { await A.signOut(AUTH); } catch {}
+    closeSheet(); toast('Account and face data deleted.'); routeAuth();
   } catch (e){ console.warn(e); toast("Couldn't delete everything. Try again."); }
   busy();
 }
@@ -1258,18 +1361,21 @@ function screenProfile(){
       <button class="cell tap" onclick="faceSheet()"><div class="main">Face Match Selfie</div><span class="val">${u.descriptor ? 'On' : 'Not Set'}</span><span class="chev">›</span></button>
       <button class="cell tap" onclick="${perm === 'granted' ? "toast('Notifications are on. Turn them off in your phone\\'s Settings.')" : 'enableNotifications()'}"><div class="main">Notifications</div><span class="val">${perm === 'granted' ? 'On' : 'Off'}</span><span class="chev">›</span></button></div>
     <div style="height:24px"></div>
-    <div class="list"><button class="cell tap" onclick="deviceSheet()"><div class="main">Use On Another Device</div><span class="chev">›</span></button>
-      <button class="cell tap" onclick="accountsSheet()"><div class="main">Switch Account</div><span class="chev">›</span></button>
+    <div class="list"><div class="cell"><div class="main">Logged In As</div><span class="val" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(AUTH?.currentUser?.email || '')}</span></div>
       <a class="cell tap" href="terms.html" target="_blank" style="color:inherit;text-decoration:none"><div class="main">Terms & Privacy</div><span class="chev">›</span></a></div>
     <div style="height:24px"></div>
-    <div class="list"><button class="cell tap red" onclick="deleteAccount()">Delete Account</button></div>
+    <div class="list"><button class="cell tap blue" onclick="logOut()">Log Out</button>${isAdminId(ME) ? '' : `<button class="cell tap red" onclick="deleteAccount()">Delete Account</button>`}</div>
     <p class="hint" style="text-align:center;margin-top:20px;font-size:13px">InFrame · Prototype</p></div>`;
 }
 function render(){
   if (!F) return;
   document.body.classList.remove('hasnav');
-  if (adminEntry || (isAdminId(ME) && !adminAuthed())){ if (!$('#admingate')) $('#app').innerHTML = adminGate(); return; }
-  if (!ME){ if (!$('#signup')) renderSignup(); return; }
+  if (adminEntry && !adminAuthed()){ if (!$('#admingate')) $('#app').innerHTML = adminGate(); return; }
+  if (!ME){
+    if (AUTH?.currentUser){ if (!$('#signup')) renderSignup(); }   // signed in, finishing profile
+    else if (!$('#auth')) renderAuth();                             // welcome / log in / sign up
+    return;
+  }
   if (!me()){ $('#app').innerHTML = '<div class="loading">Loading…</div>'; return; }
   let html = null;
   if (view.name === 'tab') html = ({inbox:screenInbox, photos:screenPhotos, groups:screenGroups, profile:screenProfile}[view.tab] || screenGroups)();
@@ -1278,8 +1384,7 @@ function render(){
   else if (view.name === 'alerts') html = screenAlerts();
   else if (view.name === 'admin') html = screenAdmin();
   if (html == null){ if (dyn.photos && Date.now() - (view.at || 0) > 5000){ stack = []; view = {name:'tab', tab:'groups'}; html = screenGroups(); } else html = '<div class="loading">Loading…</div>'; }
-  const ret = localStorage.getItem('inframe_admin_return');
-  const asBar = ret && ret !== ME && adminAuthed() ? `<div class="asbar">Viewing as ${esc(handle(ME))}<button onclick="backToAdmin()">Back To Admin</button></div>` : '';
+  const asBar = adminAuthed() && ME !== adminProfileId() ?`<div class="asbar">Viewing as ${esc(handle(ME))}<button onclick="backToAdmin()">Back To Admin</button></div>` : '';
   $('#app').innerHTML = html + asBar + tabbar();
   document.body.classList.add('hasnav');
   if (document.querySelector('#viewer.show')) drawViewer();
@@ -1293,15 +1398,11 @@ function start(){ stopAll(); stack = []; view = {name:'tab', tab:'groups'}; if (
   try { await initFirebase(); } catch (e){ $('#app').innerHTML = '<div class="empty" style="padding-top:30vh"><b>Can\'t Connect</b>Check your internet connection and reopen InFrame.</div>'; return; }
   const p = new URLSearchParams(location.search);
   if (p.get('join')) sessionStorage.setItem('inframe_join', p.get('join'));
-  if (p.has('admin')){
-    adminEntry = true;
-    if (adminAuthed()){ try { if (p.toString()) history.replaceState(null, '', location.pathname); await finishAdmin(AUTH.currentUser); return; } catch (e){ console.warn(e); } }
-  }
-  if (p.get('login') && isAdminId(p.get('login'))) toast('The admin account can only sign in with Google.');
-  else if (p.get('login')){ const s = await F.getDoc(ref('users', p.get('login'))); if (s.exists()){ setMe(s.id); toast(`Signed in as @${s.data().username}.`); } else toast("That sign-in link isn't valid."); }
+  if (p.has('admin') && !adminAuthed()) adminEntry = true;
   if (p.toString()) history.replaceState(null, '', location.pathname);
-  if (ME){ try { const s = await F.getDoc(ref('users', ME)); if (!s.exists()){ forgetAccount(ME); setMe(accounts()[0] || null); } } catch {} }
-  start();
+  ['inframe_me', 'inframe_accounts', 'inframe_admin_return'].forEach(k => localStorage.removeItem(k)); // old device-only accounts
+  booted = true;
+  await routeAuth();
 })();
 </script>
 </body>
