@@ -272,9 +272,12 @@ async function initFirebase(){
   const a = app.initializeApp(FB_CONFIG);
   try { db = fs.initializeFirestore(a, {localCache: fs.persistentLocalCache({tabManager: fs.persistentMultipleTabManager()})}); }
   catch { db = fs.getFirestore(a); }
-  AUTH = au.getAuth(a);
-  await new Promise(r => { const off = au.onAuthStateChanged(AUTH, () => { off(); r(); }); });
-  au.onAuthStateChanged(AUTH, () => later());
+  try {
+    AUTH = au.getAuth(a);
+    // Never let a slow or blocked sign-in check hold up the app.
+    await Promise.race([new Promise(r => { const off = au.onAuthStateChanged(AUTH, () => { off(); r(); }); }), new Promise(r => setTimeout(r, 4000))]);
+    au.onAuthStateChanged(AUTH, () => later());
+  } catch (e){ console.warn('auth unavailable', e); AUTH = null; }
 }
 
 /* ---------- admin (Google sign-in, locked to ADMIN_EMAIL) ---------- */
