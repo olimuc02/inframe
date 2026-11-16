@@ -365,7 +365,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 
 /* landing, human pass: plain type, marker underline, sentences instead of cards */
 .lp-hero h1{font-size:clamp(44px,10.5vw,76px);line-height:1;letter-spacing:-.03em;font-weight:700}
-.mark{position:relative;white-space:nowrap;display:inline-block}
+.mark{color:var(--accent);white-space:nowrap}
 .mark svg{position:absolute;left:-3%;bottom:-.12em;width:106%;height:.32em;overflow:visible}
 .mark path{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .mark path.thin{stroke-width:3.5;opacity:.8}
@@ -593,7 +593,7 @@ function renderAuth(){
       <button class="lp-login" onclick="showAuth('login')">Log In</button><button class="btn fill" onclick="showAuth('signup')">Start A Group</button></nav></div>
     <section class="lp-sec lp-hero">
       <div>
-        <h1>Every photo, to <span class="mark">everyone<svg viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true"><path d="M4 15C78 6 170 4 296 10"/><path d="M26 21C118 14 206 13 282 17" class="thin"/></svg></span> in it.</h1>
+        <h1>Every photo, to <span class="mark">everyone</span> in it.</h1>
         <p class="lp-lead">Everyone uploads their photos from the night. InFrame sends each one to the people in it.</p>
         ${invited}
         <div class="lp-ctas"><button class="btn fill" onclick="showAuth('signup')">Start A Group</button><button class="lp-textbtn" onclick="showAuth('login')">or log in</button></div>
