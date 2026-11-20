@@ -2275,7 +2275,7 @@ function screenEvent(){
 function eventMenu(eid){
   const e = evt(eid), g = e?.groupId, can = canManageEvent(e); if (!e) return;
   openSheet(`${sheetHead(esc(e.name))}
-    ${can ? `<div class="list"><button class="cell tap" onclick="editThingSheet('event','${eid}')"><div class="main">Edit Name, Date And Picture</div><span class="chev">›</span></button>${g ? `<button class="cell tap" onclick="editThingSheet('event','${eid}')"><div class="main">Who Was There</div><span class="chev">›</span></button>` : ''}</div><div style="height:14px"></div>` : ''}
+    ${can ? `<div class="list"><button class="cell tap" onclick="editThingSheet('event','${eid}')"><div class="main">${g ? 'Edit Event Details And People' : 'Edit Event Details'}</div><span class="chev">›</span></button></div><div style="height:14px"></div>` : ''}
     <div class="list">${g ? '' : `<button class="cell tap red" onclick="closeSheet();leave('event','${eid}')">Leave Event</button>`}${can ? `<button class="cell tap red" onclick="closeSheet();deleteEvent('${eid}')">Delete Event</button>` : ''}</div>`);
 }
 function screenAlerts(){
