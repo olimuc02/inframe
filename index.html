@@ -805,6 +805,7 @@ async function loadAdmin(){
     const all = async c => (await F.getDocs(col(c))).docs.map(d => ({id:d.id, ...d.data()}));
     const [users, groups, events, photos] = await Promise.all(['users', 'groups', 'events', 'photos'].map(all));
     ADM = {users, groups, events, photos};
+    try { ADM.bytes = await recountStorage(photos); } catch (e){ console.warn(e); ADM.bytes = photos.reduce((a, p) => a + photoBytes(p), 0); }
     photos.forEach(p => { if (!C.photos[p.id]) C.extra[p.id] = p; });
     events.forEach(e => { if (!evt(e.id)) C.extraEvents[e.id] = e; });
     users.forEach(u => { if (!C.users[u.id]) C.users[u.id] = u; });
@@ -817,9 +818,13 @@ function screenAdmin(){
   const seg = view.seg || 'overview', sb = (k, l) => `<button class="${seg === k ? 'on' : ''}" onclick="view.seg='${k}';render()">${l}</button>`;
   let body = '';
   if (seg === 'overview'){
-    const faces = ADM.users.filter(u => u.descriptor).length, mb = Math.round(ADM.photos.length * .45);
+    const faces = ADM.users.filter(u => u.descriptor).length, used = ADM.bytes || 0, pct = Math.min(100, used / STORE_LIMIT * 100), col_ = pct >= 90 ? '#E5484D' : pct >= 75 ? '#F5A524' : 'var(--accent)';
     body = `<div class="stats"><div><b>${ADM.users.length}</b><span>People</span></div><div><b>${ADM.groups.length}</b><span>Groups</span></div><div><b>${ADM.events.length}</b><span>Events</span></div></div>
-      <div class="stats" style="margin-top:10px"><div><b>${ADM.photos.length}</b><span>Photos</span></div><div><b>${faces}</b><span>Face Selfies</span></div><div><b>~${mb} MB</b><span>Of 1 GB Free</span></div></div>
+      <div class="stats" style="margin-top:10px"><div><b>${ADM.photos.length}</b><span>Photos</span></div><div><b>${faces}</b><span>Face Scans</span></div><div><b>${Math.round(pct)}%</b><span>Storage Used</span></div></div>
+      <div class="sechead">Storage</div>
+      <div class="list"><div class="cell" style="display:block"><div style="display:flex;justify-content:space-between;font-size:15px;margin-bottom:8px"><b>${fmtMB(used)} Used</b><span style="color:var(--muted)">of 1 GB free</span></div>
+        <div style="height:10px;border-radius:5px;background:var(--card2);overflow:hidden"><div style="height:100%;width:${Math.max(1, pct)}%;background:${col_};border-radius:5px"></div></div>
+        <div class="fnote" style="margin:8px 0 0">${pct >= 90 ? 'Almost full. Upgrade Firebase or move photos to Cloudflare now.' : pct >= 75 ? 'Getting full. Plan the move to cheaper storage soon.' : pct >= 50 ? "Half full. A good time to plan the move to Cloudflare." : "Plenty of room. You'll get an alert at 50%, 75% and 90%."} About ${Math.max(0, Math.round((STORE_LIMIT - used) / 2e6))} more photos fit.</div></div></div>
       <div class="sechead">Newest People</div><div class="list" style="--inset:64px">${[...ADM.users].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5).map(admUserCell).join('') || '<div class="cell"><div class="main s">Nobody yet.</div></div>'}</div>
       <div style="height:20px"></div><div class="list"><button class="cell tap blue" onclick="ADM=null;render()">Refresh Data</button></div>`;
   } else if (seg === 'people'){
@@ -869,16 +874,16 @@ async function admDeleteThing(kind, id){
   if (!confirm(`Delete ${t.name} and all of its photos for everyone? This can't be undone.`)) return;
   busy('Deleting…');
   try {
-    const eids = kind === 'group' ? (await F.getDocs(F.query(col('events'), F.where('groupId', '==', id)))).docs.map(d => d.id) : [id], ops = [];
+    const eids = kind === 'group' ? (await F.getDocs(F.query(col('events'), F.where('groupId', '==', id)))).docs.map(d => d.id) : [id], ops = []; let gone = 0;
     for (let i = 0; i < eids.length; i += 30){
       const chunk = eids.slice(i, i + 30);
       const [ps, ds, rs] = await Promise.all([F.getDocs(F.query(col('photos'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('deliveries'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('requests'), F.where('eventId', 'in', chunk)))]);
-      ps.docs.forEach(d => { ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); for (let k = 0; k < (d.data().vparts || 0); k++) ops.push(b => b.delete(ref('vchunks', `${d.id}_${k}`))); });
+      ps.docs.forEach(d => { gone += photoBytes(d.data()); ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); for (let k = 0; k < (d.data().vparts || 0); k++) ops.push(b => b.delete(ref('vchunks', `${d.id}_${k}`))); });
       ds.docs.concat(rs.docs).forEach(d => ops.push(b => b.delete(d.ref)));
     }
     eids.forEach(e => ops.push(b => b.delete(ref('events', e))));
     if (kind === 'group') ops.push(b => b.delete(ref('groups', id)));
-    await commitOps(ops); closeSheet(); toast(`${t.name} deleted.`);
+    await commitOps(ops); storageChange(-gone); closeSheet(); toast(`${t.name} deleted.`);
   } catch (e){ console.warn(e); toast("Couldn't delete everything. Try again."); }
   ADM = null; busy(); render();
 }
@@ -1022,7 +1027,7 @@ function incoming(n){
     navigator.serviceWorker?.ready.then(r => r.showNotification('InFrame', {body:n.text, icon:ICON, badge:ICON, tag:n.id})).catch(() => {});
 }
 function bannerTap(){ $('#banner').classList.remove('show'); openLink(bannerLink); }
-function openLink(l){ if (!l) return go({name:'alerts'}); if (l.v === 'inbox') tab('inbox'); else if (l.v === 'event' && evt(l.id)) go({name:'event', id:l.id, seg:l.seg || 'mine'}); else if (l.v === 'group' && C.groups[l.id]) go({name:'group', id:l.id}); else if (l.v === 'photo' && photo(l.id)) openViewer(l.id, [l.id]); else go({name:'alerts'}); }
+function openLink(l){ if (!l) return go({name:'alerts'}); if (l.v === 'inbox') tab('inbox'); else if (l.v === 'event' && evt(l.id)) go({name:'event', id:l.id, seg:l.seg || 'mine'}); else if (l.v === 'group' && C.groups[l.id]) go({name:'group', id:l.id}); else if (l.v === 'photo' && photo(l.id)) openViewer(l.id, [l.id]); else if (l.v === 'admin' && isAdminNow()) go({name:'admin', seg:'overview'}); else go({name:'alerts'}); }
 function badge(){ const n = pending().length + openReqsIn().length + openRemovals().length + openClaims().length + unreadCount(); try { n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.(); } catch {} }
 async function enableNotifications(){
   if (!('Notification' in window)){
@@ -1035,6 +1040,32 @@ async function enableNotifications(){
 async function markAllRead(){
   const un = C.notifs.filter(n => !n.read); if (!un.length) return;
   const b = F.writeBatch(db); un.forEach(n => b.update(ref('notifications', n.id), {read:true})); await b.commit();
+}
+
+/* ---------- storage meter: a running total of space used, with alerts to the admin at 50/75/90% of the free 1 GB ---------- */
+const STORE_LIMIT = 1024 ** 3, STORE_ALERTS = [50, 75, 90];
+// best guess of a photo's size for older photos saved before sizes were recorded
+const photoBytes = p => p.bytes || ((p.vparts ? p.vparts * PIECE * .75 : 0) + (p.kind === 'video' || !p.vparts ? 300000 : 0) + (p.thumb?.length || 0));
+async function storageChange(delta){
+  if (!delta) return;
+  try {
+    const r = ref('stats', 'usage');
+    await F.setDoc(r, {bytes:F.increment(Math.round(delta)), at:Date.now()}, {merge:true});
+    if (delta < 0) return;
+    const s = (await F.getDoc(r)).data() || {}, pct = s.bytes / STORE_LIMIT * 100, done = s.alerted || [];
+    const hit = STORE_ALERTS.filter(t => pct >= t && !done.includes(t)); if (!hit.length) return;
+    await F.updateDoc(r, {alerted:F.arrayUnion(...hit)});
+    const t = Math.max(...hit), admins = (await F.getDocs(F.query(col('users'), F.where('isAdmin', '==', true)))).docs.map(d => d.id);
+    const b = F.writeBatch(db), now = Date.now();
+    admins.forEach(id => b.set(F.doc(col('notifications')), {userId:id, fromId:ME, text:`⚠️ InFrame storage is ${t}% full (${fmtMB(s.bytes)} of 1 GB free). ${t >= 90 ? 'Uploads will stop soon. Upgrade Firebase or move photos to Cloudflare now.' : 'Time to plan the move to cheaper storage.'}`, link:{v:'admin'}, read:false, at:now}));
+    await b.commit();
+  } catch (e){ console.warn('storage meter', e); }
+}
+const fmtMB = b => b >= 1024 ** 3 ? (b / 1024 ** 3).toFixed(2) + ' GB' : Math.round(b / 1024 ** 2) + ' MB';
+async function recountStorage(photos){   // admin: rebuild the total from every photo (fixes any drift)
+  const bytes = Math.round(photos.reduce((a, p) => a + photoBytes(p), 0)), pct = bytes / STORE_LIMIT * 100;
+  await F.setDoc(ref('stats', 'usage'), {bytes, at:Date.now(), alerted:STORE_ALERTS.filter(t => pct >= t)}, {merge:true});
+  return bytes;
 }
 
 /* ---------- keeping it clean: no swearing, slurs or nudity ---------- */
@@ -1561,15 +1592,15 @@ async function saveAdmins(gid){
 }
 // Removes events with every photo, video, delivery and request in them.
 async function wipeEvents(eids){
-  const ops = [];
+  const ops = []; let gone = 0;
   for (let i = 0; i < eids.length; i += 30){
     const chunk = eids.slice(i, i + 30);
     const [ps, ds, rs] = await Promise.all([F.getDocs(F.query(col('photos'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('deliveries'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('requests'), F.where('eventId', 'in', chunk)))]);
-    ps.docs.forEach(d => { ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); for (let k = 0; k < (d.data().vparts || 0); k++) ops.push(b => b.delete(ref('vchunks', `${d.id}_${k}`))); });
+    ps.docs.forEach(d => { gone += photoBytes(d.data()); ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); for (let k = 0; k < (d.data().vparts || 0); k++) ops.push(b => b.delete(ref('vchunks', `${d.id}_${k}`))); });
     ds.docs.concat(rs.docs).forEach(d => ops.push(b => b.delete(d.ref)));
   }
   eids.forEach(e => ops.push(b => b.delete(ref('events', e))));
-  await commitOps(ops);
+  await commitOps(ops); storageChange(-gone);
 }
 async function deleteEvent(eid){
   const e = evt(eid); if (!canManageEvent(e)) return;
@@ -1605,7 +1636,7 @@ async function upload(eid, list){
   const ac = files.some(isVid) ? audioCtx() : null;   // made right away, while the tap still counts, so video sound records
   try { await ensureModels(); busy('Loading Safety Check…'); await ensureNsfw(); } catch (err){ busy(); return toast(typeof err === 'string' ? err : "Couldn't load the safety check. Check your connection."); }
   const members = await membersWithFaces(e), perUser = {};
-  let done = 0, vids = 0, uncat = 0, failed = 0, cut = 0, blocked = 0, errMsg = '';
+  let done = 0, vids = 0, uncat = 0, failed = 0, cut = 0, blocked = 0, errMsg = '', addedBytes = 0;
   for (const f of files){
     const n = `${done + failed + 1} of ${files.length}`;
     try {
@@ -1614,7 +1645,7 @@ async function upload(eid, list){
       if (isVid(f)){
         const out = await prepVideo(f, members, ac, pct => busy(`Getting Video ${n} Ready… ${pct}%`));
         faces = out.faces; full = out.poster; if (out.cut) cut++;
-        doc = {kind:'video', dur:out.dur, vparts:out.parts.length, vmime:out.mime, w:out.w, h:out.h, thumb:out.thumb};
+        doc = {kind:'video', dur:out.dur, vparts:out.parts.length, vmime:out.mime, w:out.w, h:out.h, thumb:out.thumb, bytes:out.parts.reduce((a, x) => a + x.length, 0) + (out.poster?.length || 0)};
         out.parts.forEach((bytes, k) => b.set(ref('vchunks', `${r.id}_${k}`), {photoId:r.id, eventId:eid, i:k, data:F.Bytes.fromUint8Array(bytes)}));
         vids++;
       } else {
@@ -1626,7 +1657,7 @@ async function upload(eid, list){
         for (let k = 0; k < bytes.length; k += PIECE) parts.push(bytes.subarray(k, k + PIECE));
         parts.forEach((part, k) => b.set(ref('vchunks', `${r.id}_${k}`), {photoId:r.id, eventId:eid, i:k, data:F.Bytes.fromUint8Array(part)}));
         full = URL.createObjectURL(blob);
-        doc = {w:c.width, h:c.height, thumb:shrink(c, 640, .8), vparts:parts.length, vmime:'image/jpeg'};
+        doc = {w:c.width, h:c.height, thumb:shrink(c, 640, .8), vparts:parts.length, vmime:'image/jpeg', bytes:bytes.length};
       }
       busy(`Uploading ${n}…`);
       const matched = [...new Set(faces.filter(x => x.matchId).map(x => x.matchId))];
@@ -1635,11 +1666,11 @@ async function upload(eid, list){
       matched.forEach(u => { const own = u === ME;   // you took it, so it's already yours: no Keep/Skip review
         b.set(ref('deliveries', `${r.id}_${u}`), {photoId:r.id, eventId:eid, userId:u, uploaderId:ME, status:own ? 'approved' : 'pending', via:own ? 'own' : 'face', at:now});
         if (!own) perUser[u] = (perUser[u] || 0) + 1; });
-      await b.commit(); fullCache.set(r.id, full);
+      await b.commit(); fullCache.set(r.id, full); addedBytes += doc.bytes + (doc.thumb?.length || 0);
       if (isUncat({faces})) uncat++; done++;
     } catch (err){ console.warn(err); if (err === 'NUDE') blocked++; else { failed++; if (typeof err === 'string') errMsg = err; } }
   }
-  busy(); ac?.close?.().catch(() => {});
+  busy(); ac?.close?.().catch(() => {}); storageChange(addedBytes);
   const photos = done - vids, what = [photos && plural(photos, 'photo'), vids && plural(vids, 'video')].filter(Boolean).join(' and ') || 'nothing';
   // Uploading to an event answers any photo requests you had for it.
   const answered = Object.values(C.reqIn).filter(r => r.eventId === eid && r.status === 'open');
@@ -1888,7 +1919,8 @@ async function deletePhoto(pid, skipAsk){
   const ds = await F.getDocs(F.query(col('deliveries'), F.where('photoId', '==', pid)));
   const b = F.writeBatch(db); ds.docs.forEach(d => b.delete(d.ref)); b.delete(ref('photos', pid)); b.delete(ref('images', pid));
   for (let k = 0; k < (photo(pid)?.vparts || 0); k++) b.delete(ref('vchunks', `${pid}_${k}`));
-  await b.commit();
+  const gone = photo(pid) ? photoBytes(photo(pid)) : 0;
+  await b.commit(); storageChange(-gone);
   if (ADM) ADM.photos = ADM.photos.filter(x => x.id !== pid);
   closeViewer(); toast('Photo deleted.');
 }

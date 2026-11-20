@@ -46,5 +46,7 @@ service cloud.firestore {
     match /inframe_requests/{id} { allow read, write: if signedIn(); }
     // private asks to take a photo down, sent to group admins / event owner and the poster
     match /inframe_removals/{id} { allow read, write: if signedIn(); }
+    // running total of storage used (just numbers)
+    match /inframe_stats/{id} { allow read, write: if signedIn(); }
   }
 }
