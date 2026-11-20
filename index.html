@@ -117,6 +117,9 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;transition:filter .15s}
 .tile .tag{position:absolute;left:6px;bottom:6px;font-size:11px;font-weight:700;background:var(--ink);color:var(--bg);padding:3px 8px;border-radius:99px}
 .tile .rx{position:absolute;right:6px;bottom:5px;font-size:13px}
+.savepick .tick{position:absolute;right:6px;top:6px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff}
+.savepick.off img{opacity:.35;filter:grayscale(1)}
+.savepick.off .tick{background:rgba(0,0,0,.35);color:transparent}
 .vmark{position:absolute;left:6px;top:6px;font-size:11px;font-weight:700;background:rgba(11,10,9,.62);color:#fff;padding:3px 8px;border-radius:99px;pointer-events:none}
 .vmark.big{left:12px;top:12px;font-size:13px;padding:5px 10px}
 .ib-ph{position:relative}
@@ -1846,24 +1849,41 @@ function saveBtn(list){
   const label = fresh.length === can.length ? `Save All ${fresh.length}` : `Save ${fresh.length} New`;
   return `<button class="btn sm tint" onclick='saveSheet(${JSON.stringify(fresh.map(p => p.id))})'>${label}</button>`;
 }
-// Shows exactly which photos will be saved, gets them ready, then one tap hands them to the phone.
-let saveFiles = null, saveIdsNow = [];
+// Shows exactly which photos will be saved. Tap a photo to leave it out; "I Already Have These" marks them saved without saving again.
+let saveFiles = null, saveIdsNow = [], saveOff = new Set();
 async function saveSheet(ids){
-  ids = ids.slice(0, 40); saveFiles = null; saveIdsNow = ids;
+  ids = ids.slice(0, 40); saveFiles = null; saveIdsNow = ids; saveOff = new Set();
   openSheet(`${sheetHead(ids.length === 1 ? 'Save 1 Photo' : `Save ${ids.length} Photos`)}
-    <p class="hint">${ids.length === 1 ? "This one isn't" : "These aren't"} on your phone yet. Ones you've already saved are left out, so you won't get duplicates.</p>
-    <div class="grid" style="margin:0 0 14px">${ids.map(id => { const p = photo(id); return `<div class="tile"><img src="${p.thumb}" alt="">${p.kind === 'video' ? `<span class="vmark">▶ ${fmtDur(p.dur)}</span>` : ''}</div>`; }).join('')}</div>
-    <button class="btn fill full" id="save-go" disabled onclick="saveGo()">Getting Ready…</button>`);
-  const files = [];
-  for (let i = 0; i < ids.length; i++){ try { files.push(await fileFor(ids[i])); } catch {} const b = $('#save-go'); if (b && saveIdsNow === ids) b.textContent = `Getting Ready… ${i + 1}/${ids.length}`; }
+    <p class="hint">${ids.length === 1 ? 'This one is' : 'These are'} new since you last saved. Already have one? Tap it to leave it out.</p>
+    <div class="grid" style="margin:0 0 14px">${ids.map(id => { const p = photo(id); return `<button class="tile savepick" data-id="${id}" onclick="toggleSave('${id}')"><img src="${p.thumb}" alt="">${p.kind === 'video' ? `<span class="vmark">▶ ${fmtDur(p.dur)}</span>` : ''}<span class="tick">✓</span></button>`; }).join('')}</div>
+    <button class="btn fill full" id="save-go" disabled onclick="saveGo()">Getting Ready…</button>
+    <button class="link" style="margin-top:8px" onclick="alreadyHave()">I Already Have ${ids.length === 1 ? 'This One' : 'These'}</button>`);
+  const files = {};
+  for (let i = 0; i < ids.length; i++){ try { files[ids[i]] = await fileFor(ids[i]); } catch {} const b = $('#save-go'); if (b && saveIdsNow === ids) b.textContent = `Getting Ready… ${i + 1}/${ids.length}`; }
   if (saveIdsNow !== ids) return;
-  saveFiles = files; const b = $('#save-go'); if (!b) return;
-  if (!files.length){ b.textContent = "Couldn't Load These"; return; }
-  b.disabled = false; b.textContent = `Save ${files.length} To Phone`;
+  saveFiles = files; saveLabel();
+}
+function saveLabel(){
+  const b = $('#save-go'); if (!b) return;
+  const n = saveIdsNow.filter(id => !saveOff.has(id)).length;
+  const al = b.nextElementSibling; if (al) al.textContent = saveOff.size ? `I Already Have The ${n === 1 ? 'Ticked One' : n + ' Ticked'}` : `I Already Have ${saveIdsNow.length === 1 ? 'This One' : 'These'}`;
+  if (!saveFiles){ return; }
+  if (!Object.keys(saveFiles).length){ b.textContent = "Couldn't Load These"; return; }
+  b.disabled = !n; b.textContent = n ? `Save ${n} To Phone` : 'Nothing Picked';
+}
+function toggleSave(id){
+  saveOff.has(id) ? saveOff.delete(id) : saveOff.add(id);
+  document.querySelector(`.savepick[data-id="${id}"]`)?.classList.toggle('off', saveOff.has(id));
+  saveLabel();
+}
+async function alreadyHave(){
+  const ids = saveIdsNow.filter(id => !saveOff.has(id)); if (!ids.length) return toast('Tick the ones you already have.');
+  closeSheet(); await markSaved(ids); toast(`Marked ${plural(ids.length, 'photo')} as saved. They won't be picked again.`);
 }
 async function saveGo(){
-  const files = saveFiles, ids = saveIdsNow; if (!files) return;
-  if (await shareFiles(files)){ closeSheet(); toast(`Saved. Next time only new photos will be picked.`); markSaved(ids); }
+  if (!saveFiles) return;
+  const ids = saveIdsNow.filter(id => !saveOff.has(id) && saveFiles[id]), files = ids.map(id => saveFiles[id]); if (!files.length) return;
+  if (await shareFiles(files)){ closeSheet(); toast('Saved. Next time only new photos will be picked.'); markSaved(ids); }
 }
 // Hands files to the phone's share sheet (Save Image / Save Video puts them in the camera roll). True when it went through.
 async function shareFiles(files){
@@ -2108,7 +2128,7 @@ async function installApp(){ if (!installEvt) return; installEvt.prompt(); try {
 const RELEASES = [
   {v:'2026-11-19d', items:[
     ['➕', 'Easier Posting', 'Tap Post, pick the group (or Single Events), then the event.'],
-    ['📲', 'No Duplicate Saves', "InFrame remembers what you've saved. The button says Save New and shows exactly which photos will be saved."],
+    ['📲', 'No Duplicate Saves', "InFrame remembers what you've saved. The button says Save New and shows exactly which photos will be saved. Tap a photo to leave it out, or tap I Already Have These."],
     ['🙈', 'Of Me Is Just Others', "Photos you posted yourself no longer show up in Of Me. They're in My Uploads."],
   ]},
   {v:'2026-11-19c', items:[
