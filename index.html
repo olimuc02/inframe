@@ -1667,16 +1667,28 @@ async function getVideo(p){
 const fmtDur = d => `0:${String(Math.round(d || 0)).padStart(2, '0')}`;
 
 /* ---------- posting from anywhere: + Post asks which event, then opens your photos ---------- */
-function postSheet(){
-  const evs = [...Object.values(C.sEvents), ...Object.values(C.gEvents)].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
-  openSheet(`${sheetHead('Post Photos & Videos')}
-    <p class="hint">Pick the event they're from. Everyone in them gets a copy.</p>
-    ${evs.length ? `<div class="list" style="--inset:72px">${evs.map(e => { const g = e.groupId ? C.groups[e.groupId] : null;
-      return `<label class="cell tap">${sq(e)}<div class="main"><div class="t">${esc(e.name)}</div><div class="s">${fmtDate(e.date)}${g ? ' · ' + esc(g.name) : ''}</div></div><span class="val" style="color:var(--accent);font-weight:650">Choose</span>
-        <input type="file" accept="image/*,video/*" multiple hidden onchange="closeSheet();upload('${e.id}',this.files)"></label>`; }).join('')}</div>`
-      : `<div class="list"><div class="cell"><div class="main" style="color:var(--muted);font-size:15px;white-space:normal">You don't have any events yet. Make one first, then add your photos to it.</div></div></div>`}
-    <div style="height:12px"></div><button class="btn ${evs.length ? 'tint' : 'fill'} full" onclick="closeSheet();setTimeout(()=>newEventSheet(null),300)">New Event</button>
-    <div class="fnote" style="text-align:center;margin-top:10px">Videos keep the first ${MAX_CLIP} seconds.</div>`);
+// + Post: step 1 picks the group (or Single Events), step 2 picks the event and opens your photos.
+function postSheet(gid){
+  const byDate = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0);
+  const singles = Object.values(C.sEvents).sort(byDate), groups = Object.values(C.groups).sort((a, b) => b.createdAt - a.createdAt);
+  const gEvs = id => Object.values(C.gEvents).filter(e => e.groupId === id).sort(byDate);
+  if (gid === undefined){
+    if (!groups.length) return postSheet('');   // no groups: go straight to single events
+    openSheet(`${sheetHead('Post Photos & Videos')}
+      <p class="hint">Where are they from? Pick a group first.</p>
+      <div class="list" style="--inset:72px">${groups.map(g => `<button class="cell tap" onclick="postSheet('${g.id}')">${sq(g)}<div class="main"><div class="t">${esc(g.name)}</div><div class="s">${plural(gEvs(g.id).length, 'event')}</div></div><span class="chev">›</span></button>`).join('')}</div>
+      <div style="height:14px"></div>
+      <div class="list" style="--inset:72px"><button class="cell tap" onclick="postSheet('')"><span class="sq">📅</span><div class="main"><div class="t">No Group</div><div class="s">Single events · ${plural(singles.length, 'event')}</div></div><span class="chev">›</span></button></div>
+      <div class="fnote" style="text-align:center;margin-top:12px">Videos keep the first ${MAX_CLIP} seconds.</div>`);
+    return;
+  }
+  const g = gid ? C.groups[gid] : null, evs = g ? gEvs(gid) : singles;
+  openSheet(`<div class="shh">${groups.length ? `<button onclick="postSheet()">‹ Back</button>` : `<button onclick="closeSheet()">Cancel</button>`}<div class="ttl">${g ? esc(g.name) : 'Single Events'}</div><span style="min-width:60px"></span></div>
+    <p class="hint">Now pick the event. Everyone in the photos gets a copy.</p>
+    ${evs.length ? `<div class="list" style="--inset:72px">${evs.map(e => `<label class="cell tap">${sq(e)}<div class="main"><div class="t">${esc(e.name)}</div><div class="s">${fmtDate(e.date)}${isPicked(e) ? ' · Only Some People' : ''}</div></div><span class="val" style="color:var(--accent);font-weight:650">Choose</span>
+        <input type="file" accept="image/*,video/*" multiple hidden onchange="closeSheet();upload('${e.id}',this.files)"></label>`).join('')}</div>`
+      : `<div class="list"><div class="cell"><div class="main" style="color:var(--muted);font-size:15px;white-space:normal">No events here yet. Make one, then add your photos to it.</div></div></div>`}
+    <div style="height:12px"></div><button class="btn ${evs.length ? 'tint' : 'fill'} full" onclick="closeSheet();setTimeout(()=>newEventSheet(${g ? `'${gid}'` : 'null'}),300)">New Event${g ? ` In ${esc(g.name)}` : ''}</button>`);
 }
 // On a laptop, drop photos or videos anywhere on an event's page.
 addEventListener('dragover', ev => { if (view?.name === 'event' && ev.dataTransfer?.types?.includes('Files')){ ev.preventDefault(); document.body.classList.add('dropping'); } });
@@ -1815,18 +1827,51 @@ async function deletePhoto(pid, skipAsk){
   if (ADM) ADM.photos = ADM.photos.filter(x => x.id !== pid);
   closeViewer(); toast('Photo deleted.');
 }
-// Hands files to the phone's share sheet (Save Image / Save Video puts them in the camera roll).
+// Remembers what you've already saved to your phone, so "Save New" only grabs photos you don't have yet.
+// Saved on your copy of the photo (synced to all your devices), plus this device for Shared Album photos you aren't in.
+let SAVED = new Set(); try { SAVED = new Set(JSON.parse(localStorage.getItem('inframe_saved') || '[]')); } catch {}
+const isSaved = pid => !!(myDel(pid)?.savedAt || SAVED.has(pid));
+async function markSaved(ids){
+  ids.forEach(id => SAVED.add(id)); try { localStorage.setItem('inframe_saved', JSON.stringify([...SAVED].slice(-3000))); } catch {}
+  const b = F.writeBatch(db), now = Date.now(); let n = 0;
+  ids.forEach(id => { const d = myDel(id); if (d && !d.savedAt){ b.update(ref('deliveries', d.id), {savedAt:now}); n++; } });
+  if (n) await b.commit().catch(() => {});
+  render();
+}
+// The button for a set of photos: Save All → Save N New → All Saved ✓. Your own uploads never count.
+function saveBtn(list){
+  const can = list.filter(p => p.uploaderId !== ME && !p.loading), fresh = can.filter(p => !isSaved(p.id));
+  if (!can.length) return '';
+  if (!fresh.length) return `<span class="fnote" style="margin:0;font-size:14px">All Saved ✓</span>`;
+  const label = fresh.length === can.length ? `Save All ${fresh.length}` : `Save ${fresh.length} New`;
+  return `<button class="btn sm tint" onclick='saveSheet(${JSON.stringify(fresh.map(p => p.id))})'>${label}</button>`;
+}
+// Shows exactly which photos will be saved, gets them ready, then one tap hands them to the phone.
+let saveFiles = null, saveIdsNow = [];
+async function saveSheet(ids){
+  ids = ids.slice(0, 40); saveFiles = null; saveIdsNow = ids;
+  openSheet(`${sheetHead(ids.length === 1 ? 'Save 1 Photo' : `Save ${ids.length} Photos`)}
+    <p class="hint">${ids.length === 1 ? "This one isn't" : "These aren't"} on your phone yet. Ones you've already saved are left out, so you won't get duplicates.</p>
+    <div class="grid" style="margin:0 0 14px">${ids.map(id => { const p = photo(id); return `<div class="tile"><img src="${p.thumb}" alt="">${p.kind === 'video' ? `<span class="vmark">▶ ${fmtDur(p.dur)}</span>` : ''}</div>`; }).join('')}</div>
+    <button class="btn fill full" id="save-go" disabled onclick="saveGo()">Getting Ready…</button>`);
+  const files = [];
+  for (let i = 0; i < ids.length; i++){ try { files.push(await fileFor(ids[i])); } catch {} const b = $('#save-go'); if (b && saveIdsNow === ids) b.textContent = `Getting Ready… ${i + 1}/${ids.length}`; }
+  if (saveIdsNow !== ids) return;
+  saveFiles = files; const b = $('#save-go'); if (!b) return;
+  if (!files.length){ b.textContent = "Couldn't Load These"; return; }
+  b.disabled = false; b.textContent = `Save ${files.length} To Phone`;
+}
+async function saveGo(){
+  const files = saveFiles, ids = saveIdsNow; if (!files) return;
+  if (await shareFiles(files)){ closeSheet(); toast(`Saved. Next time only new photos will be picked.`); markSaved(ids); }
+}
+// Hands files to the phone's share sheet (Save Image / Save Video puts them in the camera roll). True when it went through.
 async function shareFiles(files){
   if (navigator.canShare?.({files})){
-    try { await navigator.share({files}); } catch (err){
-      if (err?.name === 'NotAllowedError'){   // took too long to get ready: one more tap does it
-        window._ready = files;
-        openSheet(`${sheetHead(files.length > 1 ? `${files.length} Ready` : 'Ready', '', '')}<p class="hint">Tap below, then choose <b>Save ${files.length > 1 ? files.length + ' Items' : 'Image'}</b>.</p><button class="btn fill full" onclick="closeSheet();navigator.share({files:window._ready}).catch(()=>{})">Save To Phone</button>`);
-      }
-    }
-    return;
+    try { await navigator.share({files}); return true; } catch (err){ return false; }
   }
   for (const f of files){ const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); await new Promise(r => setTimeout(r, 300)); }
+  return true;
 }
 async function fileFor(pid){
   const p = photo(pid);
@@ -1834,14 +1879,10 @@ async function fileFor(pid){
   const data = await getFull(pid); if (!data) throw 'missing';
   return new File([await (await fetch(data)).blob()], `inframe-${pid}.jpg`, {type:'image/jpeg'});
 }
-async function saveAll(ids){
-  ids = ids.slice(0, 40); busy(`Getting ${plural(ids.length, 'photo')} ready…`);
-  const files = []; for (const id of ids){ try { files.push(await fileFor(id)); } catch {} }
-  busy(); if (!files.length) return toast("Couldn't load those photos.");
-  shareFiles(files);
-}
 async function savePhoto(pid){
-  try { const f = await fileFor(pid); return shareFiles([f]); } catch { return toast("Couldn't load it."); }
+  let f; try { f = await fileFor(pid); } catch { return toast("Couldn't load it."); }
+  if (await shareFiles([f])) markSaved([pid]);
+  else if (navigator.canShare?.({files:[f]})) saveSheet([pid]);   // phone needed a fresh tap: show the one-photo save sheet
 }
 
 /* ---------- full-screen photo viewer ---------- */
@@ -1861,7 +1902,7 @@ async function drawViewer(){
   if (d?.status === 'pending' && p.uploaderId !== ME) acts = `<button class="btn green" onclick="decide('${pid}','keep')">Keep</button><button class="btn" onclick="decide('${pid}','skip')">Skip</button><button class="btn" onclick="decide('${pid}','notme')">Not Me</button>`;
   else if (d?.status === 'claimed') acts = `<span class="fnote" style="align-self:center;margin:0 6px">Waiting for ${esc(handle(p.uploaderId))} to confirm it's you</span>`;
   else if (!d && isUncat(p) && eventMembers(e).includes(ME)) acts = `<button class="btn fill" onclick="claim('${pid}')">I'm In This One</button>`;
-  if (p.uploaderId !== ME) acts += `<button class="btn ${d?.status === 'pending' ? '' : 'fill'}" onclick="savePhoto('${pid}')">Save To Phone</button>`;   // you posted it, so it's already on your phone
+  if (p.uploaderId !== ME) acts += isSaved(pid) ? `<button class="btn" onclick="savePhoto('${pid}')">Saved ✓</button>` : `<button class="btn ${d?.status === 'pending' ? '' : 'fill'}" onclick="savePhoto('${pid}')">Save To Phone</button>`;   // you posted it, so it's already on your phone
   if (p.uploaderId === ME || isAdminNow() || canManageEvent(e)) acts +=`<button class="btn red" onclick="deletePhoto('${pid}')">Delete</button>`;
   else acts += `<button class="btn" onclick="removalSheet('${pid}')">Ask To Remove</button>`;
   const keepVid = p.kind === 'video' && $('#vvid')?.dataset.pid === pid && $('#vvid').src ? $('#vvid') : null;   // don't restart a playing video when reactions change
@@ -2062,34 +2103,43 @@ let installEvt = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; later(); });
 addEventListener('appinstalled', () => { installEvt = null; later(); });
 async function installApp(){ if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; render(); }
-/* ---------- What's New: shown once to everyone after each update. Change RELEASE.v and the list with every update. ---------- */
-const RELEASE = {v:'2026-11-19c', items:[
-  ['👆', 'Smoother Swiping', 'Photos follow your finger and slide to the next one.'],
-  ['🔔', 'Found In Earlier Photos', "When you join, InFrame looks through photos already posted and lets you know which ones you're in."],
-  ['🎬', 'Video Upload Fix', 'Videos no longer get stuck at 99%.'],
-  ['📲', 'No Duplicate Saves', "Photos you posted don't show Save To Phone, since they're already on your phone."],
-  ['🔍', 'Pinch To Zoom', 'Zoom into any photo with two fingers, or double-tap. Swiping only changes photos when you are zoomed out.'],
-  ['🖼️', 'Shared Album', "Every event has a Shared Album with everyone's uploads, even ones you aren't in."],
-  ['✏️', 'Edit Button', 'Event settings moved to the Edit button in the top right.'],
-  ['📸', 'Sharper Photos', 'Photos now upload at full quality, and your Inbox shows the sharp version.'],
-  ['✅', 'Your Own Uploads Skip Review', "Photos you post that you're in go straight to Your Photos."],
-  ['💾', 'Save To Phone', 'Save one photo, or Save All from an event, right to your camera roll.'],
-  ['👑', 'Group Admins', 'Admins can edit the group, delete events, and add other admins.'],
-  ['🔒', 'Smaller Events', 'Group admins can pick only the people who were there.'],
-  ['🖼️', 'Group And Event Pictures', 'Use your own photo or an emoji. Tap the big picture to change it.'],
-  ['🙋', 'Tag Approval', "If you say you're in a photo, the person who posted it confirms it first."],
-  ['🚫', 'Ask To Remove', 'Uncomfortable with a photo? Privately ask the admins to take it down.'],
-  ['📝', 'Photo Requests', 'Describe exactly what you are looking for.'],
-  ['🛡️', 'Kept Clean', 'Swearing, slurs and nudity are blocked.'],
-  ['🏷️', 'Cleaner Photo View', 'Name tags stay hidden until you tap Tags.'],
-]};
+/* ---------- What's New: newest update first. Add a new entry at the TOP with every update.
+   People only see the updates that came out since they last looked (or just the newest, if they've never seen one). ---------- */
+const RELEASES = [
+  {v:'2026-11-19d', items:[
+    ['➕', 'Easier Posting', 'Tap Post, pick the group (or Single Events), then the event.'],
+    ['📲', 'No Duplicate Saves', "InFrame remembers what you've saved. The button says Save New and shows exactly which photos will be saved."],
+    ['🙈', 'Of Me Is Just Others', "Photos you posted yourself no longer show up in Of Me. They're in My Uploads."],
+  ]},
+  {v:'2026-11-19c', items:[
+    ['👆', 'Smoother Swiping', 'Photos follow your finger and slide to the next one.'],
+    ['🔍', 'Pinch To Zoom', 'Zoom into any photo with two fingers, or double-tap.'],
+    ['🖼️', 'Shared Album', "Every event has a Shared Album with everyone's uploads, even ones you aren't in."],
+    ['✏️', 'Edit Button', 'Event settings moved to the Edit button in the top right.'],
+    ['🔔', 'Found In Earlier Photos', "When you join, InFrame looks through photos already posted and lets you know which ones you're in."],
+    ['🎬', 'Video Upload Fix', 'Videos no longer get stuck at 99%.'],
+  ]},
+  {v:'2026-11-19b', items:[
+    ['📸', 'Sharper Photos', 'Photos now upload at full quality, and your Inbox shows the sharp version.'],
+    ['✅', 'Your Own Uploads Skip Review', "Photos you post that you're in go straight to Your Photos."],
+    ['👑', 'Group Admins', 'Admins can edit the group, delete events, and add other admins.'],
+    ['🔒', 'Smaller Events', 'Group admins can pick only the people who were there.'],
+    ['🖼️', 'Group And Event Pictures', 'Use your own photo or an emoji. Tap the big picture to change it.'],
+    ['🙋', 'Tag Approval', "If you say you're in a photo, the person who posted it confirms it first."],
+    ['🚫', 'Ask To Remove', 'Uncomfortable with a photo? Privately ask the admins to take it down.'],
+    ['🛡️', 'Kept Clean', 'Swearing, slurs and nudity are blocked.'],
+  ]},
+];
 function whatsNew(force){
   let seen = null; try { seen = localStorage.getItem('inframe_seen_release'); } catch {}
-  if (!force && seen === RELEASE.v) return;
-  try { localStorage.setItem('inframe_seen_release', RELEASE.v); } catch {}
+  const newest = RELEASES[0].v;
+  if (!force && seen === newest) return;
+  try { localStorage.setItem('inframe_seen_release', newest); } catch {}
   if (!force && !seen && Date.now() - (me()?.createdAt || 0) < 864e5) return;   // brand-new accounts skip it
+  const upto = RELEASES.findIndex(r => r.v === seen), show = force || upto < 0 ? [RELEASES[0]] : RELEASES.slice(0, upto);
+  const items = show.flatMap(r => r.items);
   openSheet(`${sheetHead("What's New")}
-    <div class="list" style="--inset:58px">${RELEASE.items.map(([e, t, d]) => `<div class="cell"><span class="sq" style="width:34px;height:34px;border-radius:10px;font-size:18px">${e}</span><div class="main" style="white-space:normal"><div class="t">${esc(t)}</div><div class="s" style="white-space:normal">${esc(d)}</div></div></div>`).join('')}</div>
+    <div class="list" style="--inset:58px">${items.map(([e, t, d]) => `<div class="cell"><span class="sq" style="width:34px;height:34px;border-radius:10px;font-size:18px">${e}</span><div class="main" style="white-space:normal"><div class="t">${esc(t)}</div><div class="s" style="white-space:normal">${esc(d)}</div></div></div>`).join('')}</div>
     <button class="btn fill full" style="margin-top:16px" onclick="closeSheet()">Got It</button>`);
 }
 // Step-by-step: adding InFrame to the iPhone Home Screen from Safari.
@@ -2147,8 +2197,8 @@ function screenPhotos(){
   let body;
   if (!kept.length) body = `<div class="empty">${emptyArt()}<b>No photos yet</b>Photos you keep from your Inbox land here.</div>`;
   else { const by = {}; kept.forEach(p => (by[p.eventId] = by[p.eventId] || []).push(p));
-    body = Object.entries(by).map(([eid, ps]) => { const e = evt(eid), ids = ps.map(p => p.id), sv = ps.filter(p => p.uploaderId !== ME).map(p => p.id);
-      return `<div class="sechead" style="margin-left:0">${esc(e?.name || 'Event')}<span>${fmtDate(e?.date)}</span>${sv.length ? `<button onclick='saveAll(${JSON.stringify(sv)})'>Save All</button>` : ''}</div><div class="grid">${ps.map(p => tileHTML(p, ids)).join('')}</div>`; }).join(''); }
+    body = Object.entries(by).map(([eid, ps]) => { const e = evt(eid), ids = ps.map(p => p.id);
+      return `<div class="sechead" style="margin-left:0;align-items:center"><span style="color:var(--ink)">${esc(e?.name || 'Event')} <span style="font-weight:400;font-size:14px;color:var(--muted)">${fmtDate(e?.date)}</span></span>${saveBtn(ps)}</div><div class="grid">${ps.map(p => tileHTML(p, ids)).join('')}</div>`; }).join(''); }
   return `<div class="nav">${getAppBtn()}<span class="spacer"></span>${bell()}</div><div class="large"><h1>Photos</h1></div><div class="content">${kept.length ? `<p class="hint">${plural(kept.length, 'photo')} of you.</p>` : ''}${body}</div>`;
 }
 function screenGroups(){
@@ -2183,9 +2233,8 @@ function screenGroup(){
 function screenEvent(){
   const e = evt(view.id); if (!e || !eventMembers(e).includes(ME)) return null;
   const g = e.groupId ? C.groups[e.groupId] : null, all = Object.values(C.photos).filter(p => p.eventId === e.id).sort((a, b) => b.createdAt - a.createdAt);
-  const mine = all.filter(p => { const d = myDel(p.id); return d && d.status !== 'declined'; }), uncat = uncatFor(e.id), ups = all.filter(p => p.uploaderId === ME);
+  const mine = all.filter(p => { const d = myDel(p.id); return d && d.status !== 'declined' && p.uploaderId !== ME; }), uncat = uncatFor(e.id), ups = all.filter(p => p.uploaderId === ME);
   const seg = view.seg === 'uncat' ? 'all' : view.seg || 'mine', list = seg === 'all' ? all : seg === 'uploads' ? ups : mine, ids = list.map(p => p.id);
-  const saveIds = list.filter(p => p.uploaderId !== ME).map(p => p.id);   // skip your own uploads: they're already on your phone
   const sb = (k, l, n) => `<button class="${seg === k ? 'on' : ''}" onclick="view.seg='${k}';render()">${l} (${n})</button>`;
   const tag = p => { if (seg === 'uploads'){ const m = p.faces.filter(f => f.matchId).length; return p.faces.length ? `${m}/${p.faces.length} Matched` : 'No Faces'; } if (seg === 'mine' && myDel(p.id)?.status === 'pending' && p.uploaderId !== ME) return 'Review'; if (seg === 'mine' && myDel(p.id)?.status === 'claimed') return 'Waiting'; if (seg === 'all' && uncat.includes(p)) return 'Unclaimed'; return ''; };
   const empty = {mine:'<b>None Yet</b>When friends upload photos you\'re in, they\'ll show up here.', all:'<b>Nothing Here Yet</b>Everything anyone uploads to this event shows up here.', uploads:'<b>No Uploads</b>Tap Upload Photos to share yours.'}[seg];
@@ -2200,7 +2249,7 @@ function screenEvent(){
     ${waitingOn(e.id).length ? `<div class="fnote" style="margin:8px 4px 0">Waiting on ${waitingOn(e.id).map(id => esc(handle(id))).join(', ')} to upload.</div>` : ''}
     ${me()?.descriptor ? '' : `<div class="callout" style="margin-top:12px"><div style="flex:1">You don't have a face selfie yet, so photos of you won't be found automatically. <a href="#" onclick="faceSheet();return false" style="color:var(--accent)">Add Selfie</a></div></div>`}
     <div class="seg">${sb('mine', 'Of Me', mine.length)}${sb('all', 'Shared Album', all.length)}${sb('uploads', 'My Uploads', ups.length)}</div>
-    ${list.length ? `${seg !== 'uploads' && saveIds.length ? `<div style="display:flex;justify-content:flex-end;margin:-4px 0 8px"><button class="btn sm tint" onclick='saveAll(${JSON.stringify(saveIds)})'>Save All ${saveIds.length} To Phone</button></div>` : ''}<div class="grid">${list.map(p => tileHTML(p, ids, tag(p))).join('')}</div>` : `<div class="empty">${empty}</div>`}
+    ${list.length ? `${seg !== 'uploads' && saveBtn(list) ? `<div style="display:flex;justify-content:flex-end;align-items:center;margin:-4px 0 8px">${saveBtn(list)}</div>` : ''}<div class="grid">${list.map(p => tileHTML(p, ids, tag(p))).join('')}</div>` : `<div class="empty">${empty}</div>`}
     </div>`;
 }
 function eventMenu(eid){
