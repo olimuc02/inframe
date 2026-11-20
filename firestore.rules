@@ -20,8 +20,11 @@ service cloud.firestore {
     }
     match /inframe_usernames/{name} {
       allow read: if signedIn();
-      allow create, update: if signedIn() && name.matches('^[a-z0-9._]{3,20}$')
+      // one person per username: a name can only be taken if it's free, and only its owner can change it
+      allow create: if signedIn() && name.matches('^[a-z0-9._]{3,20}$')
         && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if signedIn() && name.matches('^[a-z0-9._]{3,20}$')
+        && ((resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid) || isAdmin());
       allow delete: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
     // username log-in records: email encrypted with the owner's password; readable one at a time, never listable
@@ -41,5 +44,7 @@ service cloud.firestore {
     match /inframe_deliveries/{id} { allow read, write: if signedIn(); }
     match /inframe_notifications/{id} { allow read, write: if signedIn(); }
     match /inframe_requests/{id} { allow read, write: if signedIn(); }
+    // private asks to take a photo down, sent to group admins / event owner and the poster
+    match /inframe_removals/{id} { allow read, write: if signedIn(); }
   }
 }
