@@ -2045,8 +2045,11 @@ function tabbar(){
   const n = pending().length + openReqsIn().length, b = (k, l) => `<button class="${view.name === 'tab' && view.tab === k ? 'on' : ''}" onclick="tab('${k}')">${ICONS[k]}${l}${k === 'inbox' && n ? `<span class="dot">${n}</span>` : ''}</button>`;
   return `<nav class="tabbar"><div class="sbrand"><img src="icon-192.png" alt="">InFrame</div>${b('inbox', 'Inbox')}${b('photos', 'Photos')}<button class="postbtn" onclick="postSheet()" aria-label="Post Photos">${ICONS.plus}<span>Post</span></button>${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
 }
+// True once this person has InFrame on their Home Screen (saved on their account, since Safari and the Home Screen app don't share anything).
+function hasApp(){ let local = false; try { local = !!localStorage.getItem('inframe_has_app'); } catch {} return !!(standalone || local || me()?.hasHomeApp); }
+function markHasApp(){ try { localStorage.setItem('inframe_has_app', '1'); } catch {} if (ME && !me()?.hasHomeApp) F.updateDoc(ref('users', ME), {hasHomeApp:true}).catch(() => {}); }
 function getAppBtn(){
-  if (standalone) return '';
+  if (hasApp()) return '';
   if (installEvt) return `<button class="btn sm fill" style="padding:6px 12px" onclick="installApp()">Get The App</button>`;
   if (isIOS) return `<button class="btn sm fill" style="padding:6px 12px" onclick="homeScreenSheet()">＋ Add To Home Screen</button>`;
   return '';
@@ -2105,10 +2108,11 @@ function homeScreenSheet(){
       ${step(4, `Make sure <b>Open as Web App</b> is on, then tap <b>Add</b> in the top corner.`)}
       ${step(5, `Open <b>InFrame</b> from your Home Screen and log in one time. It'll remember you after that.`)}
     </div>
-    <p class="fnote" style="margin-top:12px">After that, turn on notifications from the Notifications page so you hear when someone shares a photo of you.</p>`);
+    <p class="fnote" style="margin-top:12px">After that, turn on notifications from the Notifications page so you hear when someone shares a photo of you.</p>
+    ${standalone ? '' : `<button class="link" style="margin-top:6px" onclick="markHasApp();closeSheet();render();toast('Got it. We won\'t ask again.')">I Already Did This</button>`}`);
 }
 function installCallout(){
-  if (standalone || localStorage.getItem('inframe_hide_install')) return '';
+  if (hasApp() || localStorage.getItem('inframe_hide_install')) return '';
   const x = `<button class="x" onclick="localStorage.setItem('inframe_hide_install',1);render()" aria-label="Dismiss">✕</button>`;
   if (installEvt) return `<div class="callout"><img src="${ICON}" alt=""><div style="flex:1"><b>Get The App</b><br>Install InFrame for a full-screen app and notifications.<br><button class="btn sm fill" style="margin-top:8px" onclick="installApp()">Install App</button></div>${x}</div>`;
   if (isIOS) return `<div class="callout"><img src="${ICON}" alt=""><div style="flex:1"><b>Get The App</b><br>Put InFrame on your Home Screen for a full-screen app, notifications, and staying signed in.<br><button class="btn sm fill" style="margin-top:8px" onclick="homeScreenSheet()">Show Me How</button></div>${x}</div>`;
@@ -2220,7 +2224,7 @@ function screenProfile(){
     <div class="content"><div class="stats"><div><b>${photosOfMe}</b><span>Photos Of Me</span></div><div><b>${ups}</b><span>Uploads</span></div><div><b>${Object.keys(C.groups).length}</b><span>Groups</span></div></div>
     <div style="height:24px"></div>
     <div class="list"><button class="cell tap" onclick="whatsNew(true)"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px">✨</span><div class="main">What's New</div><span class="chev">›</span></button></div><div style="height:24px"></div>
-    ${isIOS && !standalone ? `<div class="list"><button class="cell tap" onclick="homeScreenSheet()"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px;background:var(--accent);color:#fff">+</span><div class="main">Add To Home Screen</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
+    ${isIOS && !hasApp() ? `<div class="list"><button class="cell tap" onclick="homeScreenSheet()"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px;background:var(--accent);color:#fff">+</span><div class="main">Add To Home Screen</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
     ${isAdminNow() ? `<div class="list"><button class="cell tap" onclick="ADM=null;go({name:'admin',seg:'overview'})"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px;background:var(--accent);color:#fff">A</span><div class="main">Admin Panel</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
     <div class="list"><button class="cell tap" onclick="editProfileSheet()"><div class="main">Edit Profile</div><span class="chev">›</span></button>
       <button class="cell tap" onclick="faceSheet()"><div class="main">Face Match Selfies</div><span class="val">${userDescs(u).length ? userDescs(u).length + ' of 5' : 'Not Set'}</span><span class="chev">›</span></button>
@@ -2256,6 +2260,7 @@ function render(){
   $('#app').innerHTML = html + asBar + tabbar();
   document.body.classList.add('hasnav');
   if (document.querySelector('#viewer.show') && !vZoomed) drawViewer();
+  if (standalone && !me()?.hasHomeApp && !markHasApp.done){ markHasApp.done = true; markHasApp(); }
   if (view.name === 'tab' && !$('#dim') && !whatsNew.done){ whatsNew.done = true; setTimeout(() => { if (!$('#dim')) whatsNew(); }, 900); }
   document.querySelectorAll('img[data-full]').forEach(async im => { const id = im.dataset.full; if (!id || fullCache.get(id) === im.src) return; const u = await getFull(id).catch(() => null); if (u && im.isConnected) im.src = u; });
 }
