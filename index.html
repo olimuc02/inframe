@@ -243,13 +243,13 @@ body.dropping #app{outline:3px dashed var(--accent);outline-offset:-10px;border-
 .vtop button{border:0;background:rgba(243,239,231,.12);color:#F3EFE7;width:36px;height:36px;border-radius:50%;font-size:17px;display:flex;align-items:center;justify-content:center}
 .vtop .vt{flex:1;text-align:center;font:700 16px var(--display)}
 .vtop .vs{font:400 13px -apple-system,system-ui,sans-serif;color:#A39C90}
-.vimg{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;position:relative}
+.vimg{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;position:relative}
+.vwrap{will-change:transform}
 .vwrap{position:relative;display:inline-block;line-height:0}
 .vwrap img{max-width:100vw;max-height:calc(100dvh - var(--sat) - var(--sab) - 214px);display:block}
 .fbox{position:absolute;pointer-events:none;line-height:1.2;animation:fbin .2s ease}
 @keyframes fbin{from{opacity:0}to{opacity:1}}
-.fbox span{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);white-space:nowrap;background:rgba(20,18,16,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px}
-.fbox span::before{content:'';position:absolute;left:50%;top:-4px;margin-left:-4px;border:4px solid transparent;border-top:0;border-bottom-color:rgba(20,18,16,.62)}
+.fbox span{position:absolute;left:50%;top:100%;transform:translate(-50%,6px);display:inline-flex;align-items:center;height:22px;white-space:nowrap;background:rgba(20,18,16,.7);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#fff;font:600 12px/1 -apple-system,system-ui,sans-serif;padding:0 10px;border-radius:11px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .vwith{font-size:13px;color:#A39C90;text-align:center;margin:-4px 16px 8px}
 .vwith b{color:#F3EFE7;font-weight:600}
 .hidebox .fbox{display:none}
@@ -936,8 +936,8 @@ async function fetchExtras(){
   }
 }
 const fullCache = new Map();
-async function getFull(id){
-  const p = photo(id);
+async function getFull(id, given){
+  const p = given || photo(id);
   if (!fullCache.has(id) && p?.vparts && p.kind !== 'video'){ try { fullCache.set(id, await getVideo(p)); } catch {} }   // high-quality photos are saved in pieces
   if (!fullCache.has(id)){ const s = await F.getDoc(ref('images', id)); fullCache.set(id, s.exists() ? s.data().data : null); }
   return fullCache.get(id);
@@ -1449,7 +1449,7 @@ async function joinTarget(kind, id){
   closeSheet(); toast(`You joined ${s.data().name}.`);
   setTimeout(() => go(kind === 'group' ? {name:'group', id} : {name:'event', id, seg:'mine'}), 300);
   let eids = [id];
-  if (kind === 'group') eids = (await F.getDocs(F.query(col('events'), F.where('groupId', '==', id)))).docs.map(d => d.id);
+  if (kind === 'group') eids = (await F.getDocs(F.query(col('events'), F.where('groupId', '==', id)))).docs.filter(d => !d.data().members?.length || d.data().members.includes(ME)).map(d => d.id);
   rescanForMe(eids);
 }
 // "Who was there?" for group events: everyone in the group, or only the people the admin ticks.
@@ -1583,7 +1583,7 @@ async function upload(eid, list){
     answered.forEach(r => notify([r.fromId], `${handle(ME)} uploaded ${what} from ${e.name} like you asked`, {v:'event', id:eid, seg:'mine'}));
   }
   for (const [u, n] of Object.entries(perUser)) notify([u], `${handle(ME)} added ${plural(n, 'photo')} of you from ${e.name}`, {v:'inbox'});
-  if (uncat) notify(eventMembers(e), `${plural(uncat, 'new photo')} in ${e.name} need${uncat === 1 ? 's' : ''} someone to claim ${uncat === 1 ? 'it' : 'them'}`, {v:'event', id:eid, seg:'uncat'});
+  if (uncat) notify(eventMembers(e), `${plural(uncat, 'new photo')} in ${e.name} ${uncat === 1 ? 'was' : 'were'} added to the Shared Album`, {v:'event', id:eid, seg:'all'});
   const sent = Object.values(perUser).reduce((a, b) => a + b, 0);
   toast(done ? `Added ${what}${sent ? ` · sent to ${plural(Object.keys(perUser).length, 'person', 'people')}` : ''}${uncat ? ` · ${uncat} to claim` : ''}${cut ? ` · videos keep the first ${MAX_CLIP} seconds` : ''}${failed ? ` · ${failed} failed` : ''}${blocked ? ` · ${blocked} blocked for nudity` : ''}`
     : blocked ? `${plural(blocked, 'upload')} blocked. InFrame doesn't allow nudity.` : (errMsg || "Couldn't upload those. Try again."));
@@ -1599,6 +1599,7 @@ function openVideo(file){
   return new Promise((res, rej) => {
     const v = document.createElement('video'), url = URL.createObjectURL(file);
     v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; v.crossOrigin = 'anonymous';
+    v.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none'; document.body.appendChild(v);   // iPhone keeps playing it smoothly when it's on the page
     v.onloadeddata = () => res({v, url}); v.onerror = () => rej("Couldn't open that video. Try a .mp4 or .mov.");
     setTimeout(() => rej("That video took too long to open."), 20000); v.src = url; v.load();
   });
@@ -1641,14 +1642,16 @@ async function prepVideo(file, members, ac, prog){
         if (v.ended || v.currentTime >= dur) return r(); v.requestVideoFrameCallback ? v.requestVideoFrameCallback(tick) : requestAnimationFrame(tick); };
       tick(); setTimeout(r, (dur + 8) * 1000);
     });
-    v.pause(); rec.stop(); await stopped; stream.getTracks().forEach(t => t.stop());
+    v.pause(); try { rec.requestData(); } catch {} rec.stop();
+    await Promise.race([stopped, new Promise(r => setTimeout(r, 4000))]);   // iPhone sometimes never says "stopped"
+    prog(100); stream.getTracks().forEach(t => t.stop());
     const type = (rec.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(bits, {type});
     if (!blob.size) throw "Couldn't read that video. Try another one.";
     if (blob.size > MAX_VIDEO_BYTES) throw 'That video is too big even after shrinking. Try a shorter clip.';
     const all = new Uint8Array(await blob.arrayBuffer()), parts = [];
     for (let i = 0; i < all.length; i += PIECE) parts.push(all.slice(i, i + PIECE));
     return {faces, poster, thumb, parts, mime:type, dur:Math.round(dur * 10) / 10, cut:full > MAX_CLIP + .5, w:cv.width, h:cv.height};
-  } finally { v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); }
+  } finally { v.removeAttribute('src'); v.load(); v.remove(); URL.revokeObjectURL(url); }
 }
 // Load a video's pieces and join them back into a playable file.
 const vidCache = new Map();
@@ -1687,11 +1690,11 @@ async function rescanForMe(eids){
   photos = photos.filter(p => p.faces?.some(f => !f.matchId) && !(p.notMe || []).includes(ME) && !(p.matched || []).includes(ME));
   if (!photos.length) return;
   try { await ensureModels(); } catch (e){ return; }
-  let n = 0, found = 0;
+  let n = 0, found = 0; const byUp = {};
   for (const p of photos){
     busy(`Looking For You In Earlier Photos ${++n}/${photos.length}…`);
     try {
-      const data = await getFull(p.id); if (!data) continue;
+      const data = await getFull(p.id, p); if (!data) continue;
       const c = await toCanvas(data, 1600), dets = await detect(c); let best = null;
       dets.forEach(d => { const dist = faceDist(d.descriptor, u); if (dist < MATCH && (!best || dist < best.dist)) best = {d, dist}; });
       if (!best) continue;
@@ -1701,10 +1704,18 @@ async function rescanForMe(eids){
       const b = F.writeBatch(db);
       b.update(ref('photos', p.id), {faces:p.faces.map((f, i) => i === idx ? {...f, matchId:ME} : f), matched:F.arrayUnion(ME)});
       b.set(ref('deliveries', `${p.id}_${ME}`), {photoId:p.id, eventId:p.eventId, userId:ME, uploaderId:p.uploaderId, status:'pending', via:'face', at:Date.now()});
-      await b.commit(); found++;
+      await b.commit(); found++; (byUp[p.uploaderId] = byUp[p.uploaderId] || []).push(p);
     } catch (e){ console.warn(e); }
   }
-  busy(); if (found) toast(`Found you in ${plural(found, 'earlier photo')}. Check your Inbox.`);
+  busy(); if (!found) return;
+  toast(`Found you in ${plural(found, 'earlier photo')}. Check your Inbox.`);
+  // a notification for you (from whoever posted them), and a heads-up to each poster
+  const b = F.writeBatch(db), now = Date.now();
+  for (const [up, ps] of Object.entries(byUp)){
+    if (up !== ME) b.set(F.doc(col('notifications')), {userId:ME, fromId:up, text:`${handle(up)} already posted ${plural(ps.length, 'photo')} of you from ${evt(ps[0].eventId)?.name || 'an event'}. They're in your Inbox.`, link:{v:'inbox'}, read:false, at:now});
+  }
+  await b.commit().catch(() => {});
+  Object.entries(byUp).forEach(([up, ps]) => notify([up], `${handle(ME)} just joined and was found in ${ps.length === 1 ? 'one of your photos' : ps.length + ' of your photos'}`, {v:'event', id:ps[0].eventId, seg:'all'}));
 }
 
 /* ---------- photo requests ---------- */
@@ -1768,7 +1779,7 @@ async function answerClaim(id, yes){
     const b = F.writeBatch(db); b.update(ref('deliveries', id), {status:'approved', confirmedAt:Date.now()});
     if (p && !(p.matched || []).includes(c.userId)) b.update(ref('photos', c.photoId), {matched:F.arrayUnion(c.userId), faces:[...(p.faces || []), {box:null, matchId:c.userId}]});
     await b.commit(); notify([c.userId], `${handle(ME)} confirmed you're in their photo. It's in Your Photos now.`, {v:'photo', id:c.photoId}); toast('Tag confirmed.');
-  } else { await F.deleteDoc(ref('deliveries', id)); notify([c.userId], `${handle(ME)} said that photo isn't you`, {v:'event', id:c.eventId, seg:'uncat'}); toast('Tag declined.'); }
+  } else { await F.deleteDoc(ref('deliveries', id)); notify([c.userId], `${handle(ME)} said that photo isn't you`, {v:'event', id:c.eventId, seg:'all'}); toast('Tag declined.'); }
 }
 function removalSheet(pid){
   const p = photo(pid), e = evt(p?.eventId); if (!p || !e) return;
@@ -1850,7 +1861,7 @@ async function drawViewer(){
   if (d?.status === 'pending' && p.uploaderId !== ME) acts = `<button class="btn green" onclick="decide('${pid}','keep')">Keep</button><button class="btn" onclick="decide('${pid}','skip')">Skip</button><button class="btn" onclick="decide('${pid}','notme')">Not Me</button>`;
   else if (d?.status === 'claimed') acts = `<span class="fnote" style="align-self:center;margin:0 6px">Waiting for ${esc(handle(p.uploaderId))} to confirm it's you</span>`;
   else if (!d && isUncat(p) && eventMembers(e).includes(ME)) acts = `<button class="btn fill" onclick="claim('${pid}')">I'm In This One</button>`;
-  acts += `<button class="btn ${d?.status === 'pending' && p.uploaderId !== ME ? '' : 'fill'}" onclick="savePhoto('${pid}')">Save To Phone</button>`;
+  if (p.uploaderId !== ME) acts += `<button class="btn ${d?.status === 'pending' ? '' : 'fill'}" onclick="savePhoto('${pid}')">Save To Phone</button>`;   // you posted it, so it's already on your phone
   if (p.uploaderId === ME || isAdminNow() || canManageEvent(e)) acts +=`<button class="btn red" onclick="deletePhoto('${pid}')">Delete</button>`;
   else acts += `<button class="btn" onclick="removalSheet('${pid}')">Ask To Remove</button>`;
   const keepVid = p.kind === 'video' && $('#vvid')?.dataset.pid === pid && $('#vvid').src ? $('#vvid') : null;   // don't restart a playing video when reactions change
@@ -1866,9 +1877,52 @@ async function drawViewer(){
   if (keepVid){ $('#vvid').replaceWith(keepVid); $('#vload')?.remove(); }
   else if (p.kind === 'video') getVideo(p).then(u => { const v = $('#vvid'); if (v && vList[vIdx] === pid){ v.src = u; $('#vload')?.remove(); v.play().catch(() => {}); } }).catch(() => { const l = $('#vload'); if (l) l.textContent = "Couldn't load this video."; });
   else { const full = await getFull(pid); if (full && vList[vIdx] === pid && $('#vimg')) $('#vimg').src = full; }
-  const area = $('.vimg'); let sx = null;
-  area.ontouchstart = ev => sx = ev.touches[0].clientX;
-  area.ontouchend = ev => { if (sx == null) return; const dx = ev.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 50) vStep(dx < 0 ? 1 : -1); };
+  vZoomed = false; zoomable($('.vimg'), p.kind === 'video');
+  [vList[vIdx + 1], vList[vIdx - 1]].forEach(n => { const q = n && photo(n); if (q && q.kind !== 'video') getFull(n).then(u => { if (u){ const i = new Image(); i.src = u; } }).catch(() => {}); });
+}
+// Pinch to zoom, drag to look around, double-tap to zoom. When not zoomed, the photo follows your finger and slides to the next one.
+let vZoomed = false, vEnter = 0;
+function zoomable(area, isVideo){
+  const w = area.querySelector('.vwrap'); if (!w) return;
+  let z = 1, x = 0, y = 0, start = null, multi = false, lastTap = 0, swipe = null;
+  const apply = anim => { w.style.transition = anim ? 'transform .25s cubic-bezier(.2,.8,.2,1)' : 'none'; w.style.transform = `translate(${x}px,${y}px) scale(${z})`; vZoomed = z > 1; };
+  const clamp = () => { const bw = w.offsetWidth, bh = w.offsetHeight, mx = Math.max(0, (bw * z - area.clientWidth) / 2), my = Math.max(0, (bh * z - area.clientHeight) / 2); x = Math.max(-mx, Math.min(mx, x)); y = Math.max(-my, Math.min(my, y)); };
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  if (vEnter){ x = vEnter * area.clientWidth * .6; apply(); w.style.opacity = '.4'; requestAnimationFrame(() => requestAnimationFrame(() => { x = 0; w.style.transition = 'transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s'; w.style.opacity = '1'; w.style.transform = 'translate(0,0) scale(1)'; })); vEnter = 0; }
+  area.addEventListener('touchstart', ev => {
+    const t = ev.touches;
+    if (t.length === 2){ multi = true; swipe = null; start = {d:dist(t), z, x, y, mx:(t[0].clientX + t[1].clientX) / 2, my:(t[0].clientY + t[1].clientY) / 2}; }
+    else if (t.length === 1){ multi = false; swipe = null; start = {sx:t[0].clientX, sy:t[0].clientY, x, y, at:Date.now()}; }
+  }, {passive:true});
+  area.addEventListener('touchmove', ev => {
+    if (!start) return; const t = ev.touches;
+    if (t.length === 2 && start.d){ ev.preventDefault(); z = Math.max(1, Math.min(5, start.z * dist(t) / start.d)); x = start.x + (t[0].clientX + t[1].clientX) / 2 - start.mx; y = start.y + (t[0].clientY + t[1].clientY) / 2 - start.my; apply(); return; }
+    if (t.length !== 1 || start.sx == null || multi) return;
+    const dx = t[0].clientX - start.sx, dy = t[0].clientY - start.sy;
+    if (z > 1){ ev.preventDefault(); x = start.x + dx; y = start.y + dy; clamp(); apply(); return; }
+    if (swipe == null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) swipe = Math.abs(dx) > Math.abs(dy);
+    if (swipe){ ev.preventDefault(); const edge = (dx > 0 && vIdx === 0) || (dx < 0 && vIdx === vList.length - 1); x = edge ? dx * .3 : dx; w.style.transition = 'none'; w.style.transform = `translate(${x}px,0)`; w.style.opacity = String(1 - Math.min(.5, Math.abs(x) / area.clientWidth)); }
+  }, {passive:false});
+  area.addEventListener('touchend', ev => {
+    if (ev.touches.length){ if (ev.touches.length === 1) start = {sx:ev.touches[0].clientX, sy:ev.touches[0].clientY, x, y, at:Date.now()}; return; }
+    const ch = ev.changedTouches[0], dx = start?.sx != null ? ch.clientX - start.sx : 0, dy = start?.sy != null ? ch.clientY - start.sy : 0;
+    if (swipe && z === 1){
+      const fast = Math.abs(dx) / Math.max(1, Date.now() - start.at) > .5, dir = dx < 0 ? 1 : -1, ni = vIdx + dir;
+      if ((Math.abs(dx) > area.clientWidth * .22 || (fast && Math.abs(dx) > 30)) && ni >= 0 && ni < vList.length){
+        w.style.transition = 'transform .18s ease-in, opacity .18s'; w.style.transform = `translate(${-dir * area.clientWidth}px,0)`; w.style.opacity = '0';
+        setTimeout(() => { vEnter = dir; vStep(dir); }, 170);
+      } else { x = 0; w.style.transition = 'transform .25s cubic-bezier(.2,.8,.2,1), opacity .25s'; w.style.transform = 'translate(0,0)'; w.style.opacity = '1'; }
+      swipe = null; start = null; return;
+    }
+    if (z < 1.05){ z = 1; x = 0; y = 0; apply(true); } else { clamp(); apply(); }
+    if (!multi && !isVideo && Math.abs(dx) < 10 && Math.abs(dy) < 10){   // double-tap
+      const now = Date.now();
+      if (now - lastTap < 300){ if (z > 1){ z = 1; x = 0; y = 0; } else { const r = area.getBoundingClientRect(); z = 2.5; x = (r.left + r.width / 2 - ch.clientX) * 1.5; y = (r.top + r.height / 2 - ch.clientY) * 1.5; clamp(); } apply(true); lastTap = 0; }
+      else lastTap = now;
+    }
+    start = null;
+  });
+  area.addEventListener('wheel', ev => { if (!ev.ctrlKey) return; ev.preventDefault(); z = Math.max(1, Math.min(5, z * Math.exp(-ev.deltaY / 100))); if (z === 1){ x = 0; y = 0; } clamp(); apply(); }, {passive:false});
 }
 // Any emoji as a reaction: + opens the full picker above the reaction bar.
 function rxMore(pid){
@@ -1878,7 +1932,7 @@ function rxMore(pid){
   $('#viewer .vbot')?.prepend(d);
 }
 function vStep(n){ const i = vIdx + n; if (i < 0 || i >= vList.length) return; vIdx = i; drawViewer(); }
-document.addEventListener('keydown', e => { if (!$('#viewer').classList.contains('show')) return; if (e.key === "ArrowRight") vStep(1); if (e.key === "ArrowLeft") vStep(-1); if (e.key === 'Escape') closeViewer(); });
+document.addEventListener('keydown', e => { if (!$('#viewer').classList.contains('show')) return; if (e.key === "ArrowRight"){ vEnter = 1; vStep(1); } if (e.key === "ArrowLeft"){ vEnter = -1; vStep(-1); } if (e.key === 'Escape') closeViewer(); });
 
 /* ---------- profile ---------- */
 function editProfileSheet(){
@@ -1991,6 +2045,12 @@ function tabbar(){
   const n = pending().length + openReqsIn().length, b = (k, l) => `<button class="${view.name === 'tab' && view.tab === k ? 'on' : ''}" onclick="tab('${k}')">${ICONS[k]}${l}${k === 'inbox' && n ? `<span class="dot">${n}</span>` : ''}</button>`;
   return `<nav class="tabbar"><div class="sbrand"><img src="icon-192.png" alt="">InFrame</div>${b('inbox', 'Inbox')}${b('photos', 'Photos')}<button class="postbtn" onclick="postSheet()" aria-label="Post Photos">${ICONS.plus}<span>Post</span></button>${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
 }
+function getAppBtn(){
+  if (standalone) return '';
+  if (installEvt) return `<button class="btn sm fill" style="padding:6px 12px" onclick="installApp()">Get The App</button>`;
+  if (isIOS) return `<button class="btn sm fill" style="padding:6px 12px" onclick="homeScreenSheet()">＋ Add To Home Screen</button>`;
+  return '';
+}
 function bell(){ const n = unreadCount(); return `<button class="iconbtn" onclick="go({name:'alerts'})" aria-label="Notifications">${ICONS.bell}${n ? `<span class="dot">${n}</span>` : ''}</button>`; }
 function topBar(title, right){ return `<div class="nav"><button class="back" onclick="back()">${chevron} Back</button><div class="ttl">${esc(title || '')}</div><span class="spacer"></span>${right || ''}</div>`; }
 const tileHTML = (p, list, tag) => `<button class="tile" onclick="openViewer('${p.id}',${esc(JSON.stringify(list))})"><img src="${p.thumb}" alt="" loading="lazy">${p.kind === 'video' ? `<span class="vmark">▶ ${fmtDur(p.dur)}</span>` : ''}${tag ? `<span class="tag">${tag}</span>` : ''}${Object.keys(p.reactions || {}).length ? `<span class="rx">${[...new Set(Object.values(p.reactions))].slice(0, 3).join('')}</span>` : ''}</button>`;
@@ -2000,7 +2060,14 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = 
 addEventListener('appinstalled', () => { installEvt = null; later(); });
 async function installApp(){ if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; render(); }
 /* ---------- What's New: shown once to everyone after each update. Change RELEASE.v and the list with every update. ---------- */
-const RELEASE = {v:'2026-11-19b', items:[
+const RELEASE = {v:'2026-11-19c', items:[
+  ['👆', 'Smoother Swiping', 'Photos follow your finger and slide to the next one.'],
+  ['🔔', 'Found In Earlier Photos', "When you join, InFrame looks through photos already posted and lets you know which ones you're in."],
+  ['🎬', 'Video Upload Fix', 'Videos no longer get stuck at 99%.'],
+  ['📲', 'No Duplicate Saves', "Photos you posted don't show Save To Phone, since they're already on your phone."],
+  ['🔍', 'Pinch To Zoom', 'Zoom into any photo with two fingers, or double-tap. Swiping only changes photos when you are zoomed out.'],
+  ['🖼️', 'Shared Album', "Every event has a Shared Album with everyone's uploads, even ones you aren't in."],
+  ['✏️', 'Edit Button', 'Event settings moved to the Edit button in the top right.'],
   ['📸', 'Sharper Photos', 'Photos now upload at full quality, and your Inbox shows the sharp version.'],
   ['✅', 'Your Own Uploads Skip Review', "Photos you post that you're in go straight to Your Photos."],
   ['💾', 'Save To Phone', 'Save one photo, or Save All from an event, right to your camera roll.'],
@@ -2056,7 +2123,7 @@ function screenInbox(){
     + (rms.length ? `<div class="sechead" style="margin-top:4px">Removal Requests</div>${rms.map(r => `<div class="card inbox">${mini(r.photoId)}<div class="main"><div class="t">${esc(handle(r.fromId))} asked to remove this</div><div class="s">${esc(evt(r.eventId)?.name || 'Event')} · ${ago(r.at)}</div>
       ${r.reason ? `<div style="font-size:15px;margin-top:4px;white-space:pre-wrap">“${esc(r.reason)}”</div>` : ''}
       <div class="row" style="margin-top:8px"><button class="btn sm red" onclick="answerRemoval('${r.id}',true)">Delete It</button><button class="btn sm tint" onclick="answerRemoval('${r.id}',false)">Keep It</button></div></div></div>`).join('')}` : '');
-  return `<div class="nav"><span class="spacer"></span>${bell()}</div><div class="large"><h1>Inbox</h1>${items.length > 1 ? `<button class="btn sm fill" onclick="keepAll()">Keep All ${items.length}</button>` : ''}</div>
+  return `<div class="nav">${getAppBtn()}<span class="spacer"></span>${bell()}</div><div class="large"><h1>Inbox</h1>${items.length > 1 ? `<button class="btn sm fill" onclick="keepAll()">Keep All ${items.length}</button>` : ''}</div>
     <div class="content"><p class="hint">${items.length ? `${plural(items.length, 'new photo')} of you. Keep the ones you love.` : "Photos your friends took that you're in."}</p>
     ${extraCards}${reqs.length ? `<div class="sechead" style="margin-top:4px">Photo Requests</div>${reqs.map(requestCard).join('')}${items.length ? '<div class="sechead">Photos Of You</div>' : ''}` : ''}
     ${items.length ? `<div class="ibgrid">${items.map(p => `<article class="ib">
@@ -2076,14 +2143,14 @@ function screenPhotos(){
   let body;
   if (!kept.length) body = `<div class="empty">${emptyArt()}<b>No photos yet</b>Photos you keep from your Inbox land here.</div>`;
   else { const by = {}; kept.forEach(p => (by[p.eventId] = by[p.eventId] || []).push(p));
-    body = Object.entries(by).map(([eid, ps]) => { const e = evt(eid), ids = ps.map(p => p.id);
-      return `<div class="sechead" style="margin-left:0">${esc(e?.name || 'Event')}<span>${fmtDate(e?.date)}</span><button onclick='saveAll(${JSON.stringify(ids)})'>Save All</button></div><div class="grid">${ps.map(p => tileHTML(p, ids)).join('')}</div>`; }).join(''); }
-  return `<div class="nav"><span class="spacer"></span>${bell()}</div><div class="large"><h1>Photos</h1></div><div class="content">${kept.length ? `<p class="hint">${plural(kept.length, 'photo')} of you.</p>` : ''}${body}</div>`;
+    body = Object.entries(by).map(([eid, ps]) => { const e = evt(eid), ids = ps.map(p => p.id), sv = ps.filter(p => p.uploaderId !== ME).map(p => p.id);
+      return `<div class="sechead" style="margin-left:0">${esc(e?.name || 'Event')}<span>${fmtDate(e?.date)}</span>${sv.length ? `<button onclick='saveAll(${JSON.stringify(sv)})'>Save All</button>` : ''}</div><div class="grid">${ps.map(p => tileHTML(p, ids)).join('')}</div>`; }).join(''); }
+  return `<div class="nav">${getAppBtn()}<span class="spacer"></span>${bell()}</div><div class="large"><h1>Photos</h1></div><div class="content">${kept.length ? `<p class="hint">${plural(kept.length, 'photo')} of you.</p>` : ''}${body}</div>`;
 }
 function screenGroups(){
   const gs = Object.values(C.groups).sort((a, b) => b.createdAt - a.createdAt);
   const es = Object.values(C.sEvents).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  return `<div class="nav"><span class="spacer"></span>${bell()}</div><div class="large"><h1>Groups</h1><button class="iconbtn" onclick="newGroupSheet()" aria-label="New Group">${ICONS.plus}</button></div>
+  return `<div class="nav">${getAppBtn()}<span class="spacer"></span>${bell()}</div><div class="large"><h1>Groups</h1><button class="iconbtn" onclick="newGroupSheet()" aria-label="New Group">${ICONS.plus}</button></div>
     <div class="content">${installCallout()}
     <div class="sechead" style="margin-top:6px">Your Groups<button onclick="newGroupSheet()">New Group</button></div>
     ${gs.length ? `<div class="list" style="--inset:72px">${gs.map(g => { const n = Object.values(C.gEvents).filter(e => e.groupId === g.id).length;
@@ -2113,11 +2180,13 @@ function screenEvent(){
   const e = evt(view.id); if (!e || !eventMembers(e).includes(ME)) return null;
   const g = e.groupId ? C.groups[e.groupId] : null, all = Object.values(C.photos).filter(p => p.eventId === e.id).sort((a, b) => b.createdAt - a.createdAt);
   const mine = all.filter(p => { const d = myDel(p.id); return d && d.status !== 'declined'; }), uncat = uncatFor(e.id), ups = all.filter(p => p.uploaderId === ME);
-  const seg = view.seg || 'mine', list = seg === 'uncat' ? uncat : seg === 'uploads' ? ups : mine, ids = list.map(p => p.id);
+  const seg = view.seg === 'uncat' ? 'all' : view.seg || 'mine', list = seg === 'all' ? all : seg === 'uploads' ? ups : mine, ids = list.map(p => p.id);
+  const saveIds = list.filter(p => p.uploaderId !== ME).map(p => p.id);   // skip your own uploads: they're already on your phone
   const sb = (k, l, n) => `<button class="${seg === k ? 'on' : ''}" onclick="view.seg='${k}';render()">${l} (${n})</button>`;
-  const tag = p => { if (seg === 'uploads'){ const m = p.faces.filter(f => f.matchId).length; return p.faces.length ? `${m}/${p.faces.length} Matched` : 'No Faces'; } if (seg === 'mine' && myDel(p.id)?.status === 'pending' && p.uploaderId !== ME) return 'Review'; if (seg === 'mine' && myDel(p.id)?.status === 'claimed') return 'Waiting'; return ''; };
-  const empty = {mine:'<b>None Yet</b>When friends upload photos you\'re in, they\'ll show up here.', uncat:'<b>Nothing Here</b>Photos with faces nobody matched, or no faces at all, land here so anyone can claim them.', uploads:'<b>No Uploads</b>Tap Upload Photos to share yours.'}[seg];
-  return `${topBar(e.name, `<button class="iconbtn" onclick="inviteSheet('${g ? 'group' : 'event'}','${g ? g.id : e.id}')" aria-label="Invite" style="font-size:17px">Invite</button>`)}
+  const tag = p => { if (seg === 'uploads'){ const m = p.faces.filter(f => f.matchId).length; return p.faces.length ? `${m}/${p.faces.length} Matched` : 'No Faces'; } if (seg === 'mine' && myDel(p.id)?.status === 'pending' && p.uploaderId !== ME) return 'Review'; if (seg === 'mine' && myDel(p.id)?.status === 'claimed') return 'Waiting'; if (seg === 'all' && uncat.includes(p)) return 'Unclaimed'; return ''; };
+  const empty = {mine:'<b>None Yet</b>When friends upload photos you\'re in, they\'ll show up here.', all:'<b>Nothing Here Yet</b>Everything anyone uploads to this event shows up here.', uploads:'<b>No Uploads</b>Tap Upload Photos to share yours.'}[seg];
+  const hasMenu = canManageEvent(e) || !g;
+  return `${topBar(e.name, `<button class="iconbtn" onclick="inviteSheet('${g ? 'group' : 'event'}','${g ? g.id : e.id}')" aria-label="Invite" style="font-size:17px;width:auto;padding:0 6px">Invite</button>${hasMenu ? `<button class="iconbtn" onclick="eventMenu('${e.id}')" aria-label="Edit" style="font-size:17px;width:auto;padding:0 6px;font-weight:600">Edit</button>` : ''}`)}
     <div class="hero">${canManageEvent(e) ? `<button style="border:0;background:none;padding:0;display:block;margin:0 auto" onclick="editThingSheet('event','${e.id}')" aria-label="Change Picture">${sq(e, true)}</button>` : sq(e, true)}<h1>${esc(e.name)}</h1><div class="s">${fmtDate(e.date)} · ${g ? esc(g.name) : 'Single Event'}${isPicked(e) ? ` · ${plural(e.members.length, 'person', 'people')} Only` : ''}</div></div>
     ${membersRow(eventMembers(e))}
     <div class="content">
@@ -2126,10 +2195,15 @@ function screenEvent(){
       <button class="btn tint" style="flex:1;padding:15px;border-radius:14px" onclick="requestSheet('${e.id}')">Request Photos</button></div>
     ${waitingOn(e.id).length ? `<div class="fnote" style="margin:8px 4px 0">Waiting on ${waitingOn(e.id).map(id => esc(handle(id))).join(', ')} to upload.</div>` : ''}
     ${me()?.descriptor ? '' : `<div class="callout" style="margin-top:12px"><div style="flex:1">You don't have a face selfie yet, so photos of you won't be found automatically. <a href="#" onclick="faceSheet();return false" style="color:var(--accent)">Add Selfie</a></div></div>`}
-    <div class="seg">${sb('mine', 'Of Me', mine.length)}${sb('uncat', 'Uncategorized', uncat.length)}${sb('uploads', 'My Uploads', ups.length)}</div>
-    ${list.length ? `${seg !== 'uncat' ? `<div style="display:flex;justify-content:flex-end;margin:-4px 0 8px"><button class="btn sm tint" onclick='saveAll(${JSON.stringify(ids)})'>Save All ${list.length} To Phone</button></div>` : ''}<div class="grid">${list.map(p => tileHTML(p, ids, tag(p))).join('')}</div>` : `<div class="empty">${empty}</div>`}
-    ${canManageEvent(e) ? `<div style="height:28px"></div><div class="list"><button class="cell tap" onclick="editThingSheet('event','${e.id}')"><div class="main">Edit Name, Date And Picture</div><span class="chev">›</span></button></div>` : ''}
-    ${g && !canManageEvent(e) ? '' : `<div style="height:${canManageEvent(e) ? 14 : 28}px"></div><div class="list">${g ? '' : `<button class="cell tap red" onclick="leave('event','${e.id}')">Leave Event</button>`}${canManageEvent(e) ? `<button class="cell tap red" onclick="deleteEvent('${e.id}')">Delete Event</button>` : ''}</div>`}</div>`;
+    <div class="seg">${sb('mine', 'Of Me', mine.length)}${sb('all', 'Shared Album', all.length)}${sb('uploads', 'My Uploads', ups.length)}</div>
+    ${list.length ? `${seg !== 'uploads' && saveIds.length ? `<div style="display:flex;justify-content:flex-end;margin:-4px 0 8px"><button class="btn sm tint" onclick='saveAll(${JSON.stringify(saveIds)})'>Save All ${saveIds.length} To Phone</button></div>` : ''}<div class="grid">${list.map(p => tileHTML(p, ids, tag(p))).join('')}</div>` : `<div class="empty">${empty}</div>`}
+    </div>`;
+}
+function eventMenu(eid){
+  const e = evt(eid), g = e?.groupId, can = canManageEvent(e); if (!e) return;
+  openSheet(`${sheetHead(esc(e.name))}
+    ${can ? `<div class="list"><button class="cell tap" onclick="editThingSheet('event','${eid}')"><div class="main">Edit Name, Date And Picture</div><span class="chev">›</span></button>${g ? `<button class="cell tap" onclick="editThingSheet('event','${eid}')"><div class="main">Who Was There</div><span class="chev">›</span></button>` : ''}</div><div style="height:14px"></div>` : ''}
+    <div class="list">${g ? '' : `<button class="cell tap red" onclick="closeSheet();leave('event','${eid}')">Leave Event</button>`}${can ? `<button class="cell tap red" onclick="closeSheet();deleteEvent('${eid}')">Delete Event</button>` : ''}</div>`);
 }
 function screenAlerts(){
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
@@ -2141,7 +2215,7 @@ function screenAlerts(){
 function screenProfile(){
   const u = me(), photosOfMe = Object.values(C.deliveries).filter(d => d.status === 'approved').length, ups = Object.values(C.photos).filter(p => p.uploaderId === ME).length;
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
-  return `<div class="nav"><span class="spacer"></span>${bell()}</div>
+  return `<div class="nav">${getAppBtn()}<span class="spacer"></span>${bell()}</div>
     <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${profileDetails(u)}</div>
     <div class="content"><div class="stats"><div><b>${photosOfMe}</b><span>Photos Of Me</span></div><div><b>${ups}</b><span>Uploads</span></div><div><b>${Object.keys(C.groups).length}</b><span>Groups</span></div></div>
     <div style="height:24px"></div>
@@ -2181,7 +2255,7 @@ function render(){
   const asBar = adminAuthed() && ME !== adminProfileId() ?`<div class="asbar">Viewing as ${esc(handle(ME))}<button onclick="backToAdmin()">Back To Admin</button></div>` : '';
   $('#app').innerHTML = html + asBar + tabbar();
   document.body.classList.add('hasnav');
-  if (document.querySelector('#viewer.show')) drawViewer();
+  if (document.querySelector('#viewer.show') && !vZoomed) drawViewer();
   if (view.name === 'tab' && !$('#dim') && !whatsNew.done){ whatsNew.done = true; setTimeout(() => { if (!$('#dim')) whatsNew(); }, 900); }
   document.querySelectorAll('img[data-full]').forEach(async im => { const id = im.dataset.full; if (!id || fullCache.get(id) === im.src) return; const u = await getFull(id).catch(() => null); if (u && im.isConnected) im.src = u; });
 }
