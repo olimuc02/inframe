@@ -17,6 +17,8 @@
 <link rel="icon" href="tab-icon-32.png?v=2" sizes="32x32" type="image/png">
 <link rel="shortcut icon" href="tab-icon.ico?v=2">
 <title>InFrame</title>
+<script>/* apply the saved Light/Dark choice before anything draws */
+try { const t = localStorage.getItem('inframe_theme'); if (t === 'light' || t === 'dark'){ document.documentElement.dataset.theme = t; document.querySelectorAll('meta[name=theme-color]').forEach(m => { m.content = t === 'dark' ? '#11100E' : '#F3EFE7'; m.removeAttribute('media'); }); } } catch {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Caveat:wght@600&display=swap" rel="stylesheet">
@@ -30,11 +32,16 @@
   --hand:"Caveat","Bradley Hand","Segoe Print",cursive;
   --shadow:0 1px 0 rgba(22,21,19,.04),0 10px 30px -12px rgba(22,21,19,.18);
 }
+/* Appearance: Automatic follows the phone; Light / Dark are picked in Profile (saved as data-theme on <html>). */
 @media (prefers-color-scheme:dark){
-  :root{ --bg:#11100E; --card:#1B1A17; --card2:#27251F; --ink:#F3EFE7; --ink2:#D8D2C6; --muted:#9A9387; --sep:rgba(243,239,231,.12);
+  :root:not([data-theme="light"]){ color-scheme:dark; --bg:#11100E; --card:#1B1A17; --card2:#27251F; --ink:#F3EFE7; --ink2:#D8D2C6; --muted:#9A9387; --sep:rgba(243,239,231,.12);
     --accent:#FF6A33; --accent-soft:rgba(255,106,51,.17); --link:#FF8F63; --green:#3BC47A; --red:#FF6B6E; --bar:rgba(17,16,14,.86);
     --shadow:0 10px 30px -12px rgba(0,0,0,.6); }
 }
+:root[data-theme="dark"]{ color-scheme:dark; --bg:#11100E; --card:#1B1A17; --card2:#27251F; --ink:#F3EFE7; --ink2:#D8D2C6; --muted:#9A9387; --sep:rgba(243,239,231,.12);
+  --accent:#FF6A33; --accent-soft:rgba(255,106,51,.17); --link:#FF8F63; --green:#3BC47A; --red:#FF6B6E; --bar:rgba(17,16,14,.86);
+  --shadow:0 10px 30px -12px rgba(0,0,0,.6); }
+:root[data-theme="light"]{ color-scheme:light; }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Roboto,"Segoe UI","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -109,6 +116,15 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;transition:filter .15s}
 .tile .tag{position:absolute;left:6px;bottom:6px;font-size:11px;font-weight:700;background:var(--ink);color:var(--bg);padding:3px 8px;border-radius:99px}
 .tile .rx{position:absolute;right:6px;bottom:5px;font-size:13px}
+.vmark{position:absolute;left:6px;top:6px;font-size:11px;font-weight:700;background:rgba(11,10,9,.62);color:#fff;padding:3px 8px;border-radius:99px;pointer-events:none}
+.vmark.big{left:12px;top:12px;font-size:13px;padding:5px 10px}
+.ib-ph{position:relative}
+.vwrap video{max-width:100vw;max-height:calc(100dvh - var(--sat) - var(--sab) - 214px);display:block;background:#000}
+.vload{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(11,10,9,.7);color:#fff;font-size:14px;font-weight:600;padding:8px 14px;border-radius:99px;line-height:1.2;white-space:nowrap}
+.tabbar .postbtn{color:var(--bg)}
+.tabbar .postbtn svg{width:22px;height:22px;background:var(--accent);color:#fff;border-radius:12px;padding:8px;box-sizing:content-box;margin-top:-4px}
+.tabbar .postbtn span{color:var(--ink);margin-top:-1px}
+body.dropping #app{outline:3px dashed var(--accent);outline-offset:-10px;border-radius:20px}
 .empty{text-align:center;color:var(--muted);padding:44px 24px;font-size:15px;line-height:1.45}
 .empty b{display:block;color:var(--ink);font:700 22px var(--display);letter-spacing:-.02em;margin-bottom:6px}
 .empty .art{width:120px;margin:0 auto 14px;display:block}
@@ -157,6 +173,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .field input::placeholder{color:var(--muted);opacity:.8}
 .field textarea{resize:none;height:66px}
 .field .at{color:var(--muted);margin-right:-8px}
+.field label span.at{width:auto;font-weight:400;color:var(--muted)}
 .fnote{font-size:13px;color:var(--muted);margin:-4px 6px 14px}
 .box{background:var(--card);border:1px solid var(--sep);border-radius:20px;padding:22px;text-align:center;margin-bottom:14px}
 .facecirc{width:132px;height:132px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 10px;box-shadow:0 0 0 4px var(--bg),0 0 0 6px var(--accent)}
@@ -190,6 +207,13 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .check input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--accent)}
 .onb .grow{flex:1;min-height:12px}
 .link{border:0;background:none;color:var(--link);font-size:15px;font-weight:600;padding:10px;display:block;margin:4px auto 0}
+.emo{background:var(--card);border:1px solid var(--sep);border-radius:16px;margin-bottom:12px;overflow:hidden}
+.emocats{display:flex;gap:4px;overflow-x:auto;padding:8px 8px 6px;border-bottom:1px solid var(--sep);scrollbar-width:none}
+.emocats::-webkit-scrollbar{display:none}
+.emocats button{flex:none;border:0;background:none;border-radius:99px;padding:5px 10px 5px 7px;font-size:17px;display:flex;align-items:center;gap:5px;color:var(--muted)}
+.emocats button span{font-size:12px;font-weight:650}
+.emocats button.on{background:var(--ink);color:var(--bg)}
+.emo .emojis{border:0;border-radius:0;margin:0;max-height:236px;overflow-y:auto}
 .emojis{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:10px;background:var(--card);border:1px solid var(--sep);border-radius:16px;margin-bottom:12px}
 .emojis button{border:0;background:none;font-size:26px;aspect-ratio:1;border-radius:12px;padding:0;line-height:1}
 .emojis button.on{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
@@ -228,6 +252,14 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .rxbar button{border:0;background:rgba(243,239,231,.1);border-radius:99px;padding:6px 11px;font-size:20px;color:#F3EFE7;display:flex;align-items:center;gap:4px}
 .rxbar button.on{background:var(--accent)}
 .rxbar small{font-size:13px;font-weight:700}
+.rxbar{overflow-x:auto;scrollbar-width:none;padding:0 12px;justify-content:safe center}
+.rxbar::-webkit-scrollbar{display:none}
+.rxbar button{flex:none}
+.rxbar .rxplus{font-size:22px;font-weight:600;min-width:46px;justify-content:center}
+.rxmore{margin:0 12px 10px}
+.rxmore .emo{background:#1B1A17;border-color:rgba(243,239,231,.12);color:#F3EFE7}
+.rxmore .emo .emojis{background:#1B1A17;max-height:200px}
+.rxmore .emocats button{color:#9A9387}.rxmore .emocats button.on{background:#F3EFE7;color:#11100E}
 .vact{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .vact .btn{background:rgba(243,239,231,.12);color:#F3EFE7}
 .vact .btn.green,.vact .btn.fill{background:var(--accent);color:#fff}
@@ -263,7 +295,11 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .prof{text-align:center;padding:6px 16px 0}
 .prof .nm{font:700 30px var(--display);letter-spacing:-.025em;margin-top:12px}
 .prof .un{color:var(--muted)}
-.prof .bio{margin-top:6px;font-size:15px}
+.prof .bio{margin:8px auto 0;font-size:15px;white-space:pre-wrap;max-width:420px}
+.prof .pdet{margin-top:6px;font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;justify-content:center;gap:2px 8px}
+.prof .pdet i{font-style:normal;opacity:.5}
+.field label.tall{align-items:stretch;padding:0 16px}
+.field label.tall textarea{height:auto;min-height:84px;resize:vertical;line-height:1.4}
 .stats{display:flex;background:var(--card);border:1px solid var(--sep);border-radius:18px;margin:20px 0 0;padding:14px 0}
 .stats div{flex:1;text-align:center}
 .stats b{display:block;font:700 24px var(--display);letter-spacing:-.02em}
@@ -290,6 +326,8 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
   .tabbar button.on{background:var(--card);color:var(--ink);font-weight:700;box-shadow:inset 0 0 0 1px var(--sep)}
   .tabbar svg{width:22px;height:22px}
   .tabbar .dot{position:static;margin-left:auto;box-shadow:none}
+  .tabbar .sbrand{order:-2} .tabbar .postbtn{order:-1;background:var(--accent);justify-content:center;margin-bottom:14px;font-weight:700}
+  .tabbar .postbtn svg{background:none;padding:0;margin:0;width:20px;height:20px} .tabbar .postbtn span{color:#fff}
   .sbrand{display:flex;align-items:center;gap:10px;font:800 23px var(--display);letter-spacing:-.03em;padding:0 10px 26px}
   .sbrand img{width:34px;height:34px;border-radius:9px}
   .grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
@@ -444,7 +482,19 @@ const TERMS_VERSION = '2026-11-15';
 const ADMIN_EMAIL = 'muckadigital@gmail.com'; // the only Google account that can open the admin account
 const MATCH = 0.55; // face distance cut-off; lower = stricter
 const FACEAPI = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/';
-const EMOJIS = ['😎','🤙','✌️','🫶','🌴','🏖️','🌊','🏄','🏔️','🏕️','🚲','🏃','⚽','🏀','🎾','⛳','🎸','🎧','🪩','🎉','🍕','🌮','🍣','☕','🍻','🍷','🍓','🐶','🐱','🦋','🌵','🌻','🔥','✨','🌙','☀️','📸','✈️','🎮','🎨'];
+// Emoji picker, grouped like a phone keyboard. Split on spaces.
+const EMOJI_CATS = [
+  ['Smileys', '😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🫡 🤐 🤨 😐 😑 😶 🫠 😏 😒 🙄 😬 😮‍💨 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 🥸 😎 🤓 🧐 😕 🫤 😟 🙁 😮 😯 😲 😳 🥺 🥹 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 ☠️ 💩 🤡 👹 👻 👽 🤖 😺 😸 😻 😼 🙈 🙉 🙊'],
+  ['Hearts', '❤️ 🧡 💛 💚 💙 🩵 💜 🤎 🖤 🩶 🤍 🩷 💔 ❤️‍🔥 💕 💞 💓 💗 💖 💘 💝 💟 ❣️ 💋 💌 💯 💢 💥 💫 💦 💨 🕳️ 💬 💭 💤'],
+  ['People', '👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 💅 🤳 💪 🦾 🧠 👀 👁️ 👅 👄 👶 🧒 👦 👧 🧑 👱 👨 🧔 👩 🧓 👴 👵 🙋 🙆 🙅 🤷 🤦 💁 🙇 🧏 💃 🕺 👯 🧖 🧘 🏃 🚶 🧍 🧎 👫 👬 👭 💏 💑 👪 🫂 🗣️ 👤 👥 🥷 🦸 🦹 🧙 🧚 🧛 🧜 🧝 🤴 👸 👰 🤵 🎅 🤶'],
+  ['Animals', '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐻‍❄️ 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🪲 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🦭 🐊 🐅 🐆 🦓 🦍 🐘 🦛 🦏 🐪 🦒 🦘 🦬 🐃 🐄 🐎 🐖 🐑 🦙 🐐 🦌 🐕 🐩 🐈 🐈‍⬛ 🪶 🐓 🦃 🦚 🦜 🦢 🦩 🕊️ 🐇 🦝 🦨 🦡 🦫 🦦 🦥 🐁 🐀 🐿️ 🦔 🌵 🎄 🌲 🌳 🌴 🪴 🌱 🌿 ☘️ 🍀 🍃 🍂 🍁 🍄 🐚 🪸 🌾 💐 🌷 🌹 🥀 🌺 🌸 🌼 🌻'],
+  ['Food', '🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🥑 🍆 🥔 🥕 🌽 🌶️ 🥒 🥬 🥦 🧄 🧅 🍄 🥜 🫘 🥐 🥯 🍞 🥖 🥨 🧀 🥚 🍳 🧈 🥞 🧇 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🫓 🥪 🌮 🌯 🫔 🥙 🧆 🥗 🥘 🫕 🍝 🍜 🍲 🍛 🍣 🍱 🥟 🦪 🍤 🍙 🍚 🍘 🍥 🥠 🥮 🍢 🍡 🍧 🍨 🍦 🥧 🧁 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪 🌰 🍯 🥛 ☕ 🫖 🍵 🧃 🥤 🧋 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🧉 🍾 🧊'],
+  ['Activities', '⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🏓 🏸 🏒 🏑 🥍 🏏 🪃 🥅 ⛳ 🪁 🏹 🎣 🤿 🥊 🥋 🎽 🛹 🛼 🛷 ⛸️ 🥌 🎿 ⛷️ 🏂 🏋️ 🤼 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🤽 🚣 🧗 🚵 🚴 🏆 🥇 🥈 🥉 🏅 🎖️ 🎗️ 🎫 🎟️ 🎪 🤹 🎭 🩰 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🪘 🎷 🎺 🪗 🎸 🪕 🎻 🎲 ♟️ 🎯 🎳 🎮 🎰 🧩 🎉 🎊 🎈 🎁 🪩 🪅 🎆 🎇 🧨 ✨'],
+  ['Travel', '🚗 🚕 🚙 🚌 🏎️ 🚓 🚑 🚒 🚐 🛻 🚚 🚜 🛵 🏍️ 🛺 🚲 🛴 🚨 🚃 🚄 🚅 🚂 🚆 🚇 🚊 ✈️ 🛫 🛬 🛩️ 💺 🛰️ 🚀 🛸 🚁 🛶 ⛵ 🚤 🛥️ 🛳️ ⛴️ 🚢 ⚓ 🗺️ 🧭 🗿 🗽 🗼 🏰 🏯 🏟️ 🎡 🎢 🎠 ⛲ ⛱️ 🏖️ 🏝️ 🏜️ 🌋 ⛰️ 🏔️ 🗻 🏕️ ⛺ 🛖 🏠 🏡 🏘️ 🏗️ 🏢 🏬 🏛️ ⛪ 🕌 🕍 🛕 🌁 🌃 🏙️ 🌄 🌅 🌆 🌇 🌉 🌌 🌠 🎑 🌍 🌎 🌏 🌐 ☀️ 🌤️ ⛅ 🌥️ ☁️ 🌦️ 🌧️ ⛈️ 🌩️ 🌨️ ❄️ ☃️ ⛄ 🌬️ 🌪️ 🌈 ☔ 💧 🌊 🔥 🌙 🌛 🌝 🌞 ⭐ 🌟'],
+  ['Objects', '📸 📷 📹 🎥 📽️ 🎞️ 📞 📱 💻 ⌨️ 🖥️ 🖨️ 🕹️ 💽 💾 📀 📺 📻 🎙️ ⏰ ⌛ ⏳ 🔋 🔌 💡 🔦 🕯️ 🧯 🛢️ 💸 💵 💴 💶 💷 💰 💳 💎 ⚖️ 🧰 🔧 🔨 🛠️ ⛏️ 🔩 ⚙️ 🧱 ⛓️ 🧲 🔫 💣 🔪 🗡️ ⚔️ 🛡️ 🔮 📿 🧿 💈 🔭 🔬 💊 💉 🩹 🧬 🧪 🌡️ 🧹 🧺 🧻 🚽 🛁 🛀 🧼 🪥 🪒 🧽 🧴 🛎️ 🔑 🗝️ 🚪 🪑 🛋️ 🛏️ 🧸 🪆 🖼️ 🪞 🪟 🛍️ 🛒 🎀 🪄 📚 📖 📝 ✏️ 🖊️ 🖍️ 📌 📎 ✂️ 🗓️ 📅 📦 ✉️ 📬 🏷️ 👓 🕶️ 🥽 👔 👕 👖 🧣 🧤 🧥 🧦 👗 👘 🥻 👙 👚 👛 👜 👝 🎒 🧳 👞 👟 🥾 🥿 👠 👡 🩴 👢 👑 👒 🎩 🎓 🧢 ⛑️ 💄 💍 💼'],
+  ['Symbols', '♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ ☮️ ✝️ ☪️ 🕉️ ☯️ ✡️ 🔯 ♾️ ⚛️ 🆗 🆒 🆕 🆓 🆙 🔝 🔜 ✅ ☑️ ✔️ ❌ ❎ ➕ ➖ ✖️ ➗ ❓ ❔ ❕ ❗ ‼️ ⁉️ 〰️ 💲 ©️ ®️ ™️ 🔴 🟠 🟡 🟢 🔵 🟣 🟤 ⚫ ⚪ 🟥 🟧 🟨 🟩 🟦 🟪 🟫 ⬛ ⬜ 🔶 🔷 🔺 🔻 💠 🔘 🎵 🎶 🔔 🔕 📣 📢 🏁 🚩 🎌 🏴 🏳️ 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️ 🇺🇸 🇨🇦 🇲🇽 🇬🇧 🇮🇪 🇫🇷 🇩🇪 🇮🇹 🇪🇸 🇵🇹 🇵🇱 🇳🇱 🇬🇷 🇧🇷 🇦🇷 🇨🇴 🇯🇵 🇰🇷 🇨🇳 🇮🇳 🇵🇭 🇦🇺 🇳🇿 🇿🇦 🇳🇬 🇯🇲'],
+].map(([name, list]) => [name, list.split(' ')]);
+const EMOJIS = EMOJI_CATS.flatMap(c => c[1]);
 const REACTS = ['❤️','😂','🔥','😍','🙌','💀'];
 const ICON = 'icon-192.png';
 
@@ -462,6 +512,16 @@ function busy(m){ const b = $('#busy'); if (m){ b.textContent = m; b.classList.a
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 const chevron = '<svg viewBox="0 0 13 21" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2 2.5 10.5 11 19"/></svg>';
+
+/* ---------- appearance (Automatic / Light / Dark, saved on this device) ---------- */
+function themeNow(){ try { return localStorage.getItem('inframe_theme') || 'auto'; } catch { return 'auto'; } }
+function setTheme(t){
+  try { t === 'auto' ? localStorage.removeItem('inframe_theme') : localStorage.setItem('inframe_theme', t); } catch {}
+  const root = document.documentElement; if (t === 'auto') delete root.dataset.theme; else root.dataset.theme = t;
+  const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelectorAll('meta[name=theme-color]').forEach(m => { m.removeAttribute('media'); m.content = dark ? '#11100E' : '#F3EFE7'; });
+  render();
+}
 
 /* ---------- local device memory ---------- */
 // ME = the profile being used: the signed-in person's Firebase id (admin uses "admin_<id>").
@@ -735,7 +795,7 @@ function admUserSheet(id){
   const u = ADM.users.find(x => x.id === id); if (!u) return;
   const gs = ADM.groups.filter(g => g.members.includes(id)), ups = ADM.photos.filter(p => p.uploaderId === id).length, inP = ADM.photos.filter(p => (p.matched || []).includes(id)).length;
   openSheet(`${sheetHead(esc(fullName(u)))}
-    <div class="prof">${avatar(u, 96, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
+    <div class="prof">${avatar(u, 96, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${profileDetails(u)}</div>
     <div class="stats"><div><b>${inP}</b><span>Matched In</span></div><div><b>${ups}</b><span>Uploads</span></div><div><b>${gs.length}</b><span>Groups</span></div></div>
     <div style="height:16px"></div><div class="list">
       <div class="cell"><div class="main">Face Selfie</div><span class="val">${u.descriptor ? 'On' : 'Off'}</span></div>
@@ -769,7 +829,7 @@ async function admDeleteThing(kind, id){
     for (let i = 0; i < eids.length; i += 30){
       const chunk = eids.slice(i, i + 30);
       const [ps, ds, rs] = await Promise.all([F.getDocs(F.query(col('photos'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('deliveries'), F.where('eventId', 'in', chunk))), F.getDocs(F.query(col('requests'), F.where('eventId', 'in', chunk)))]);
-      ps.docs.forEach(d => { ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); });
+      ps.docs.forEach(d => { ops.push(b => b.delete(d.ref)); ops.push(b => b.delete(ref('images', d.id))); for (let k = 0; k < (d.data().vparts || 0); k++) ops.push(b => b.delete(ref('vchunks', `${d.id}_${k}`))); });
       ds.docs.concat(rs.docs).forEach(d => ops.push(b => b.delete(d.ref)));
     }
     eids.forEach(e => ops.push(b => b.delete(ref('events', e))));
@@ -1039,33 +1099,55 @@ async function startScan(){
   catch { return toast('Camera not available. Use Choose Photos instead.'); }
   pushNav(); $('#scan').classList.add('show');
   const v = $('#scan-v'); v.srcObject = stream; try { await Promise.race([v.play(), new Promise(r => setTimeout(r, 1500))]); } catch {}
-  const steps = [['Look straight at the camera', 'straight'], ['Slowly turn your head to one side', 'side'], ['Now turn to the other side', 'other'], ['Tilt your chin up a little', 'up'], ['Tilt your chin down a little', 'down']];
+  /* Each shot is only taken once you're really in that pose and hold it for a moment. It never snaps on a timer.
+     The preview is mirrored, so "left" means toward the left side of the screen. */
+  const steps = [
+    ['straight', 'Look straight at the camera', ''],
+    ['left', 'Turn your head to the left', '←'],
+    ['right', 'Now turn to the right', '→'],
+    ['up', 'Tilt your chin up', '↑'],
+    ['down', 'Tilt your chin down', '↓'],
+  ];
+  const HOLD = 3, TURN = .2, TILT = .08;   // frames to hold still; how far to turn / tilt
   const got = [], c = document.createElement('canvas'), me_ = scanning = {stream, stop:false};
   const say = (m, sub) => { $('#scan-msg').textContent = m; $('#scan-sub').textContent = sub; };
-  let i = 0, stepStart = Date.now(), firstSide = 0, basePitch = .55;
-  drawRing(0); say(steps[0][0], '1 of 5');
+  let i = 0, stepStart = Date.now(), basePitch = null, held = 0, best = null;
+  const ask = (extra) => say(`${steps[i][1]} ${steps[i][2]}`.trim(), extra || `${i + 1} of 5`);
+  drawRing(0); ask();
   while (!me_.stop && i < steps.length){
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 120));
     if (!v.videoWidth) continue;
-    const k = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight)); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+    const k = Math.min(1, 560 / Math.max(v.videoWidth, v.videoHeight)); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
     const x = c.getContext('2d'); x.setTransform(-1, 0, 0, 1, c.width, 0); x.drawImage(v, 0, 0, c.width, c.height); x.setTransform(1, 0, 0, 1, 0, 0);
     let d; try { d = await faceapi.detectAllFaces(c, new faceapi.SsdMobilenetv1Options({minConfidence:.6})).withFaceLandmarks().withFaceDescriptors(); } catch { continue; }
     if (me_.stop) break;
-    if (d.length !== 1){ say(d.length ? 'Just you in the frame, please' : 'Put your face inside the circle', `${i + 1} of 5`); continue; }
-    const f = d[0], box = f.detection.box;
-    if (box.width < c.width * .16){ say('Move a little closer', `${i + 1} of 5`); continue; }
-    const pose = headPose(f.landmarks), kind = steps[i][1], late = Date.now() - stepStart > 4500; // never get stuck: after 4.5s take any clear shot
-    const ok = kind === 'straight' ? Math.abs(pose.yaw) < .1
-      : kind === 'side' ? Math.abs(pose.yaw) > .13
-      : kind === 'other' ? pose.yaw * firstSide < 0 && Math.abs(pose.yaw) > .13
-      : kind === 'up' ? pose.pitch < basePitch - .06 : pose.pitch > basePitch + .06;
-    if (!ok && !late){ say(steps[i][0], `${i + 1} of 5`); continue; }
-    if (kind === 'straight') basePitch = pose.pitch;
-    if (kind === 'side') firstSide = Math.sign(pose.yaw) || 1;
-    got.push({descriptor:Array.from(f.descriptor), thumb:squareCrop(c, 240, box)});
-    i++; drawRing(i); stepStart = Date.now();
+    const miss = m => { held = 0; best = null; say(m, `${i + 1} of 5`); };
+    if (d.length !== 1){ miss(d.length ? 'Just you in the frame, please' : 'Put your face inside the circle'); continue; }
+    const f = d[0], box = f.detection.box, cx = (box.x + box.width / 2) / c.width, cy = (box.y + box.height / 2) / c.height;
+    if (box.width < c.width * .18){ miss('Move a little closer'); continue; }
+    if (box.width > c.width * .75){ miss('Move back a little'); continue; }
+    if (Math.abs(cx - .5) > .22 || Math.abs(cy - .5) > .25){ miss('Center your face in the circle'); continue; }
+    const pose = headPose(f.landmarks), kind = steps[i][0], yaw = pose.yaw, tilt = basePitch == null ? 0 : pose.pitch - basePitch;
+    let ok = false, hint = '';
+    if (kind === 'straight'){ ok = Math.abs(yaw) < .07; hint = 'Face the camera straight on'; }
+    else if (kind === 'left' || kind === 'right'){
+      const want = kind === 'left' ? -1 : 1, amt = yaw * want;
+      ok = amt > TURN && Math.abs(tilt) < .15;
+      hint = amt < -.05 ? `Other way ${steps[i][2]}` : amt > TURN * .45 ? `A little further ${steps[i][2]}` : '';
+    } else {
+      const want = kind === 'up' ? -1 : 1, amt = tilt * want;
+      ok = amt > TILT && Math.abs(yaw) < .14;
+      hint = Math.abs(yaw) >= .14 ? 'Keep your face pointed at the camera' : amt < -.03 ? `Other way ${steps[i][2]}` : amt > TILT * .45 ? `A little more ${steps[i][2]}` : '';
+    }
+    if (!ok){ held = 0; best = null; ask(hint || (Date.now() - stepStart > 8000 ? 'Take your time. It snaps when you get there.' : '')); continue; }
+    held++; if (!best || f.detection.score > best.f.detection.score) best = {f, thumb:squareCrop(c, 240, box), pitch:pose.pitch};
+    if (held < HOLD){ say('Hold still…', `${i + 1} of 5`); continue; }
+    if (kind === 'straight') basePitch = best.pitch;
+    got.push({descriptor:Array.from(best.f.descriptor), thumb:best.thumb});
+    i++; held = 0; best = null; drawRing(i); stepStart = Date.now();
     const st = $('#sc-stage'); st.classList.add('flash'); setTimeout(() => st.classList.remove('flash'), 120);
-    if (i < steps.length) say(steps[i][0], `${i + 1} of 5`);
+    try { navigator.vibrate?.(30); } catch {}
+    if (i < steps.length) ask();
   }
   const finished = !me_.stop; stopScan();
   if (finished && got.length){ faces = got.slice(0, MAX_SELFIES); drawFaces(); toast('Face scan done. 5 shots saved.'); }
@@ -1089,8 +1171,23 @@ function avatarPicker(current, allowFace){
     </div></div>`;
 }
 let pickedEmoji = '';
-function emojiGrid(sel){ pickedEmoji = sel || ''; return `<div class="emojis">${EMOJIS.map(e => `<button class="${e === sel ? 'on' : ''}" onclick="pickEmoji(this,'${e}')">${e}</button>`).join('')}</div>`; }
-function pickEmoji(btn, e){ const on = pickedEmoji === e; btn.parentNode.querySelectorAll('button').forEach(b => b.classList.remove('on')); pickedEmoji = on ? '' : e; if (!on) btn.classList.add('on'); }
+// Emoji picker with category tabs. emoCb (optional) gets the tapped emoji instead of selecting it (used for reactions).
+let emoCb = null;
+function emojiGrid(sel, cb){
+  pickedEmoji = sel || ''; emoCb = cb || null;
+  const ci = Math.max(0, EMOJI_CATS.findIndex(c => c[1].includes(sel)));
+  return `<div class="emo"><div class="emocats">${EMOJI_CATS.map((c, i) => `<button class="${i === ci ? 'on' : ''}" onclick="emoCat(this,${i})" aria-label="${c[0]}">${c[1][0]}<span>${c[0]}</span></button>`).join('')}</div>
+    <div class="emojis">${emoCells(ci, sel)}</div></div>`;
+}
+const emoCells = (ci, sel) => EMOJI_CATS[ci][1].map(e => `<button class="${e === sel ? 'on' : ''}" onclick="pickEmoji(this,'${e}')">${e}</button>`).join('');
+function emoCat(btn, i){
+  const w = btn.closest('.emo'); w.querySelectorAll('.emocats button').forEach((b, k) => b.classList.toggle('on', k === i));
+  const g = w.querySelector('.emojis'); g.innerHTML = emoCells(i, pickedEmoji); g.scrollTop = 0;
+}
+function pickEmoji(btn, e){
+  if (emoCb) return emoCb(e);
+  const on = pickedEmoji === e; btn.closest('.emo').querySelectorAll('.emojis button').forEach(b => b.classList.remove('on')); pickedEmoji = on ? '' : e; if (!on) btn.classList.add('on');
+}
 function blankAvatar(){ return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e5ea"/><circle cx="50" cy="40" r="18" fill="#aeaeb2"/><path d="M18 92c4-18 17-28 32-28s28 10 32 28" fill="#aeaeb2"/></svg>'); }
 
 /* ---------- usernames ---------- */
@@ -1135,7 +1232,7 @@ function renderSignup(){
     <h1>Your Look</h1><p class="hint">Pick a profile picture and an emoji that's you.</p>${steps}
     ${avatarPicker(pickedAvatar || faces[0].thumb, 'faces[0].thumb')}
     <div class="sechead" style="margin-top:0">Your Emoji</div>${emojiGrid(pickedEmoji)}
-    <div class="field"><label><span>Bio</span><input id="su-bioline" maxlength="80" placeholder="Optional"></label></div>
+    <div class="sechead" style="margin-top:6px">About You</div><div class="field"><label class="tall"><textarea id="su-bioline" maxlength="300" rows="3" placeholder="A few lines about you. Optional."></textarea></label></div>
     <label class="check"><input type="checkbox" id="su-terms"><span>I agree to the <a href="terms.html" target="_blank">Terms of Service and Privacy Policy</a>.</span></label>
     <div class="grow"></div>
     <button class="btn fill full" id="su-go" onclick="suCreate()">Create Account</button>
@@ -1228,7 +1325,7 @@ async function createGroup(){
 }
 function newEventSheet(groupId){
   const opts = Object.values(C.groups).map(g => `<option value="${g.id}" ${g.id === groupId ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
-  openSheet(`${sheetHead('New Event', 'Create', 'createEvent()')}
+  openSheet(`${sheetHead('New Event', 'Create', 'makeEvent()')}
     <div class="field">
       <label><span>Name</span><input id="e-name" placeholder="Lake Weekend"></label>
       <label><span>Date</span><input id="e-date" type="date" value="${today()}"></label>
@@ -1237,7 +1334,7 @@ function newEventSheet(groupId){
     <div class="sechead" style="margin-top:6px">Event Emoji</div>${emojiGrid('')}`);
   setTimeout(() => $('#e-name')?.focus(), 350);
 }
-async function createEvent(){
+async function makeEvent(){
   const name = $('#e-name').value.trim(); if (!name) return toast('Give your event a name.');
   const groupId = $('#e-group').value || null, r = F.doc(col('events'));
   await F.setDoc(r, {name, emoji:pickedEmoji, date:$('#e-date').value, groupId, members:groupId ? [] : [ME], inviteCode:groupId ? null : code(), createdBy:ME, createdAt:Date.now()});
@@ -1299,38 +1396,144 @@ async function membersWithFaces(e, notMe){
   for (const id of ids) if (!C.users[id]){ const s = await F.getDoc(ref('users', id)); if (s.exists()) C.users[id] = {id, ...s.data()}; }
   return ids.map(id => C.users[id]).filter(u => userDescs(u).length);
 }
+const isVid = f => /^video\//.test(f.type) || /\.(mov|mp4|m4v|webm|3gp)$/i.test(f.name);
 async function upload(eid, list){
   const files = [...list]; if (!files.length) return;
-  const e = evt(eid);
+  const e = evt(eid); if (!e) return toast("Couldn't find that event.");
+  const ac = files.some(isVid) ? audioCtx() : null;   // made right away, while the tap still counts, so video sound records
   try { await ensureModels(); } catch (err){ return toast(err); }
   const members = await membersWithFaces(e), perUser = {};
-  let done = 0, uncat = 0, failed = 0;
+  let done = 0, vids = 0, uncat = 0, failed = 0, cut = 0, errMsg = '';
   for (const f of files){
-    busy(`Scanning Photo ${done + failed + 1} of ${files.length}…`);
+    const n = `${done + failed + 1} of ${files.length}`;
     try {
-      const c = await toCanvas(f, 1600), dets = await detect(c), faces = assign(dets, c, members);
-      let data = null; for (const [m, q] of [[1600, .82], [1400, .75], [1200, .7], [1000, .65]]){ data = shrink(c, m, q); if (data.length < 900000) break; }
       const r = F.doc(col('photos')), b = F.writeBatch(db), now = Date.now();
-      const matched = faces.filter(x => x.matchId).map(x => x.matchId);
-      b.set(r, {eventId:eid, uploaderId:ME, w:c.width, h:c.height, faces, matched, notMe:[], reactions:{}, thumb:shrink(c, 420, .72), createdAt:now});
-      b.set(ref('images', r.id), {data, eventId:eid});
+      let doc, faces, full;
+      if (isVid(f)){
+        const out = await prepVideo(f, members, ac, pct => busy(`Getting Video ${n} Ready… ${pct}%`));
+        faces = out.faces; full = out.poster; if (out.cut) cut++;
+        doc = {kind:'video', dur:out.dur, vparts:out.parts.length, vmime:out.mime, w:out.w, h:out.h, thumb:out.thumb};
+        out.parts.forEach((bytes, k) => b.set(ref('vchunks', `${r.id}_${k}`), {photoId:r.id, eventId:eid, i:k, data:F.Bytes.fromUint8Array(bytes)}));
+        vids++;
+      } else {
+        busy(`Scanning Photo ${n}…`);
+        const c = await toCanvas(f, 1600), dets = await detect(c); faces = assign(dets, c, members);
+        for (const [m, q] of [[1600, .82], [1400, .75], [1200, .7], [1000, .65]]){ full = shrink(c, m, q); if (full.length < 900000) break; }
+        doc = {w:c.width, h:c.height, thumb:shrink(c, 420, .72)};
+      }
+      busy(`Uploading ${n}…`);
+      const matched = [...new Set(faces.filter(x => x.matchId).map(x => x.matchId))];
+      b.set(r, {...doc, eventId:eid, uploaderId:ME, faces, matched, notMe:[], reactions:{}, createdAt:now});
+      b.set(ref('images', r.id), {data:full, eventId:eid});
       matched.forEach(u => { b.set(ref('deliveries', `${r.id}_${u}`), {photoId:r.id, eventId:eid, userId:u, uploaderId:ME, status:'pending', via:'face', at:now}); perUser[u] = (perUser[u] || 0) + 1; });
-      await b.commit(); fullCache.set(r.id, data);
+      await b.commit(); fullCache.set(r.id, full);
       if (isUncat({faces})) uncat++; done++;
-    } catch (err){ console.warn(err); failed++; }
+    } catch (err){ console.warn(err); failed++; if (typeof err === 'string') errMsg = err; }
   }
-  busy();
+  busy(); ac?.close?.().catch(() => {});
+  const photos = done - vids, what = [photos && plural(photos, 'photo'), vids && plural(vids, 'video')].filter(Boolean).join(' and ') || 'nothing';
   // Uploading to an event answers any photo requests you had for it.
   const answered = Object.values(C.reqIn).filter(r => r.eventId === eid && r.status === 'open');
   if (done && answered.length){
     const b = F.writeBatch(db); answered.forEach(r => b.update(ref('requests', r.id), {status:'done', doneAt:Date.now(), count:done})); await b.commit();
-    answered.forEach(r => notify([r.fromId], `${handle(ME)} uploaded ${plural(done, 'photo')} from ${e.name} like you asked`, {v:'event', id:eid, seg:'mine'}));
+    answered.forEach(r => notify([r.fromId], `${handle(ME)} uploaded ${what} from ${e.name} like you asked`, {v:'event', id:eid, seg:'mine'}));
   }
   for (const [u, n] of Object.entries(perUser)) notify([u], `${handle(ME)} added ${plural(n, 'photo')} of you from ${e.name}`, {v:'inbox'});
   if (uncat) notify(eventMembers(e), `${plural(uncat, 'new photo')} in ${e.name} need${uncat === 1 ? 's' : ''} someone to claim ${uncat === 1 ? 'it' : 'them'}`, {v:'event', id:eid, seg:'uncat'});
   const sent = Object.values(perUser).reduce((a, b) => a + b, 0);
-  toast(`${plural(done, 'photo')} added · ${sent} sent · ${uncat} uncategorized${failed ? ` · ${failed} failed` : ''}`);
+  toast(done ? `Added ${what}${sent ? ` · sent to ${plural(Object.keys(perUser).length, 'person', 'people')}` : ''}${uncat ? ` · ${uncat} to claim` : ''}${cut ? ` · videos keep the first ${MAX_CLIP} seconds` : ''}${failed ? ` · ${failed} failed` : ''}`
+    : (errMsg || "Couldn't upload those. Try again."));
+  if (done && !(view.name === 'event' && view.id === eid)) go({name:'event', id:eid, seg:'uploads'});
+  else if (done && view.name === 'event'){ view.seg = 'uploads'; render(); }
 }
+
+/* ---------- short videos (free plan: first 15 seconds, shrunk to ~720p, saved in small pieces) ---------- */
+const MAX_CLIP = 15, PIECE = 900 * 1024, MAX_VIDEO_BYTES = 7 * 1024 * 1024;
+let _ac = null;
+function audioCtx(){ try { _ac = new (window.AudioContext || window.webkitAudioContext)(); _ac.resume?.(); return _ac; } catch { return null; } }
+function openVideo(file){
+  return new Promise((res, rej) => {
+    const v = document.createElement('video'), url = URL.createObjectURL(file);
+    v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; v.crossOrigin = 'anonymous';
+    v.onloadeddata = () => res({v, url}); v.onerror = () => rej("Couldn't open that video. Try a .mp4 or .mov.");
+    setTimeout(() => rej("That video took too long to open."), 20000); v.src = url; v.load();
+  });
+}
+const seekTo = (v, t) => new Promise(r => { let ok = false; const done = () => { if (ok) return; ok = true; v.removeEventListener('seeked', done); r(); }; v.addEventListener('seeked', done); v.currentTime = t; setTimeout(done, 2500); });
+function vFrame(v, max){ const s = Math.min(1, max / Math.max(v.videoWidth, v.videoHeight)), c = document.createElement('canvas'); c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); return c; }
+async function prepVideo(file, members, ac, prog){
+  if (!window.MediaRecorder) throw "This browser can't upload videos. Try Safari or Chrome.";
+  const {v, url} = await openVideo(file);
+  try {
+    try { await v.play(); v.pause(); } catch {}               // iPhone needs this before frames can be read
+    const full = isFinite(v.duration) ? v.duration : MAX_CLIP, dur = Math.min(full, MAX_CLIP);
+    prog(0);
+    // 1) look for faces at a few moments in the clip
+    let bestFaces = [], extra = new Set(), poster = null, thumb = null;
+    for (const t of [.08, .35, .62, .9].map(x => x * dur)){
+      await seekTo(v, t); const c = vFrame(v, 960);
+      if (!poster){ poster = shrink(c, 1280, .8); thumb = shrink(c, 420, .72); }
+      const fs = assign(await detect(c), c, members);
+      fs.forEach(x => x.matchId && extra.add(x.matchId));
+      if (fs.length > bestFaces.length){ bestFaces = fs; poster = shrink(c, 1280, .8); thumb = shrink(c, 420, .72); }
+    }
+    const faces = bestFaces.slice(); faces.forEach(x => x.matchId && extra.delete(x.matchId));
+    extra.forEach(id => faces.push({box:null, matchId:id}));   // seen in another moment of the clip
+    // 2) re-record the clip smaller (plays through once in the background, so it takes about as long as the clip)
+    await seekTo(v, 0);
+    const s = Math.min(1, 720 / Math.max(v.videoWidth, v.videoHeight)), cv = document.createElement('canvas');
+    cv.width = Math.round(v.videoWidth * s / 2) * 2; cv.height = Math.round(v.videoHeight * s / 2) * 2;
+    const ctx = cv.getContext('2d'), stream = cv.captureStream(30);
+    if (ac){ try { const src = ac.createMediaElementSource(v), dst = ac.createMediaStreamDestination(); src.connect(dst); dst.stream.getAudioTracks().forEach(t => stream.addTrack(t)); v.muted = false; } catch (e){ console.warn('no audio', e); } }
+    const mime = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const rec = new MediaRecorder(stream, {...(mime ? {mimeType:mime} : {}), videoBitsPerSecond:1200000, audioBitsPerSecond:64000});
+    const bits = []; rec.ondataavailable = ev => ev.data.size && bits.push(ev.data);
+    const stopped = new Promise(r => rec.onstop = r);
+    ctx.drawImage(v, 0, 0, cv.width, cv.height); rec.start(500);
+    try { await v.play(); } catch { v.muted = true; await v.play(); }
+    await new Promise(r => {
+      const tick = () => { ctx.drawImage(v, 0, 0, cv.width, cv.height); prog(Math.min(99, Math.round(v.currentTime / dur * 100)));
+        if (v.ended || v.currentTime >= dur) return r(); v.requestVideoFrameCallback ? v.requestVideoFrameCallback(tick) : requestAnimationFrame(tick); };
+      tick(); setTimeout(r, (dur + 8) * 1000);
+    });
+    v.pause(); rec.stop(); await stopped; stream.getTracks().forEach(t => t.stop());
+    const type = (rec.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(bits, {type});
+    if (!blob.size) throw "Couldn't read that video. Try another one.";
+    if (blob.size > MAX_VIDEO_BYTES) throw 'That video is too big even after shrinking. Try a shorter clip.';
+    const all = new Uint8Array(await blob.arrayBuffer()), parts = [];
+    for (let i = 0; i < all.length; i += PIECE) parts.push(all.slice(i, i + PIECE));
+    return {faces, poster, thumb, parts, mime:type, dur:Math.round(dur * 10) / 10, cut:full > MAX_CLIP + .5, w:cv.width, h:cv.height};
+  } finally { v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); }
+}
+// Load a video's pieces and join them back into a playable file.
+const vidCache = new Map();
+async function getVideo(p){
+  if (!vidCache.has(p.id)) vidCache.set(p.id, (async () => {
+    const s = await F.getDocs(F.query(col('vchunks'), F.where('photoId', '==', p.id)));
+    const parts = s.docs.map(d => d.data()).sort((a, b) => a.i - b.i).map(d => d.data.toUint8Array());
+    if (!parts.length) throw 'missing';
+    return URL.createObjectURL(new Blob(parts, {type:p.vmime || 'video/mp4'}));
+  })().catch(e => { vidCache.delete(p.id); throw e; }));
+  return vidCache.get(p.id);
+}
+const fmtDur = d => `0:${String(Math.round(d || 0)).padStart(2, '0')}`;
+
+/* ---------- posting from anywhere: + Post asks which event, then opens your photos ---------- */
+function postSheet(){
+  const evs = [...Object.values(C.sEvents), ...Object.values(C.gEvents)].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+  openSheet(`${sheetHead('Post Photos & Videos')}
+    <p class="hint">Pick the event they're from. Everyone in them gets a copy.</p>
+    ${evs.length ? `<div class="list" style="--inset:72px">${evs.map(e => { const g = e.groupId ? C.groups[e.groupId] : null;
+      return `<label class="cell tap">${sq(e)}<div class="main"><div class="t">${esc(e.name)}</div><div class="s">${fmtDate(e.date)}${g ? ' · ' + esc(g.name) : ''}</div></div><span class="val" style="color:var(--accent);font-weight:650">Choose</span>
+        <input type="file" accept="image/*,video/*" multiple hidden onchange="closeSheet();upload('${e.id}',this.files)"></label>`; }).join('')}</div>`
+      : `<div class="list"><div class="cell"><div class="main" style="color:var(--muted);font-size:15px;white-space:normal">You don't have any events yet. Make one first, then add your photos to it.</div></div></div>`}
+    <div style="height:12px"></div><button class="btn ${evs.length ? 'tint' : 'fill'} full" onclick="closeSheet();setTimeout(()=>newEventSheet(null),300)">New Event</button>
+    <div class="fnote" style="text-align:center;margin-top:10px">Videos keep the first ${MAX_CLIP} seconds.</div>`);
+}
+// On a laptop, drop photos or videos anywhere on an event's page.
+addEventListener('dragover', ev => { if (view?.name === 'event' && ev.dataTransfer?.types?.includes('Files')){ ev.preventDefault(); document.body.classList.add('dropping'); } });
+addEventListener('dragleave', ev => { if (!ev.relatedTarget) document.body.classList.remove('dropping'); });
+addEventListener('drop', ev => { document.body.classList.remove('dropping'); if (view?.name !== 'event' || !ev.dataTransfer?.files?.length) return; ev.preventDefault(); upload(view.id, [...ev.dataTransfer.files].filter(f => /^(image|video)\//.test(f.type) || isVid(f))); });
 // After you join (or update your selfie), look through earlier photos for faces nobody was matched to.
 async function rescanForMe(eids){
   const u = me() || (await F.getDoc(ref('users', ME))).data(); if (!userDescs(u).length || !eids.length) return;
@@ -1387,7 +1590,7 @@ function requestCard(r){
   const e = evt(r.eventId);
   return `<div class="card inbox">${avatar(user(r.fromId), 48, true)}<div class="main"><div class="t">${esc(handle(r.fromId))} wants your photos</div><div class="s">From ${esc(e?.name || 'an event')} · ${ago(r.at)}</div>
     ${r.note ? `<div style="font-size:15px;margin-top:4px">“${esc(r.note)}”</div>` : ''}
-    <div class="row" style="margin-top:8px"><label class="btn sm fill">Upload Photos<input type="file" accept="image/*" multiple hidden onchange="upload('${r.eventId}',this.files)"></label><button class="btn sm tint" onclick="dismissRequest('${r.id}')">Dismiss</button></div></div></div>`;
+    <div class="row" style="margin-top:8px"><label class="btn sm fill">Upload<input type="file" accept="image/*,video/*" multiple hidden onchange="upload('${r.eventId}',this.files)"></label><button class="btn sm tint" onclick="dismissRequest('${r.id}')">Dismiss</button></div></div></div>`;
 }
 
 /* ---------- approving & reacting ---------- */
@@ -1416,13 +1619,22 @@ async function react(pid, e){
   if (cur !== e) notify([p.uploaderId], `${handle(ME)} reacted ${e} to your photo`, {v:'photo', id:pid});
 }
 async function deletePhoto(pid){
-  if (!confirm('Delete this photo for everyone?')) return;
+  if (!confirm(`Delete this ${photo(pid)?.kind === 'video' ? 'video' : 'photo'} for everyone?`)) return;
   const ds = await F.getDocs(F.query(col('deliveries'), F.where('photoId', '==', pid)));
-  const b = F.writeBatch(db); ds.docs.forEach(d => b.delete(d.ref)); b.delete(ref('photos', pid)); b.delete(ref('images', pid)); await b.commit();
+  const b = F.writeBatch(db); ds.docs.forEach(d => b.delete(d.ref)); b.delete(ref('photos', pid)); b.delete(ref('images', pid));
+  for (let k = 0; k < (photo(pid)?.vparts || 0); k++) b.delete(ref('vchunks', `${pid}_${k}`));
+  await b.commit();
   if (ADM) ADM.photos = ADM.photos.filter(x => x.id !== pid);
   closeViewer(); toast('Photo deleted.');
 }
 async function savePhoto(pid){
+  const p = photo(pid);
+  if (p?.kind === 'video'){
+    try { const url = await getVideo(p), blob = await (await fetch(url)).blob(), ext = blob.type.includes('mp4') ? 'mp4' : 'webm', file = new File([blob], `inframe-${pid}.${ext}`, {type:blob.type});
+      if (navigator.canShare?.({files:[file]})){ try { await navigator.share({files:[file]}); } catch {} return; }
+      const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); } catch { toast("Couldn't load the video."); }
+    return;
+  }
   const data = await getFull(pid); if (!data) return toast("Couldn't load the photo.");
   const blob = await (await fetch(data)).blob(), file = new File([blob], `inframe-${pid}.jpg`, {type:'image/jpeg'});
   if (navigator.canShare?.({files:[file]})){ try { await navigator.share({files:[file]}); } catch {} return; }
@@ -1437,7 +1649,7 @@ function viewerAfterAction(pid){ if (!$('#viewer').classList.contains('show')) r
 async function drawViewer(){
   const pid = vList[vIdx], p = photo(pid); if (!p) return closeViewer();
   const e = evt(p.eventId), d = myDel(pid);
-  const boxes = (p.faces || []).map(f => `<div class="fbox ${f.matchId ? '' : 'unk'}" style="left:${f.box.x * 100}%;top:${f.box.y * 100}%;width:${f.box.w * 100}%;height:${f.box.h * 100}%"><span>${f.matchId ? esc(handle(f.matchId)) : '?'}</span></div>`).join('');
+  const boxes = (p.faces || []).filter(f => f.box).map(f => `<div class="fbox ${f.matchId ? '' : 'unk'}" style="left:${f.box.x * 100}%;top:${f.box.y * 100}%;width:${f.box.w * 100}%;height:${f.box.h * 100}%"><span>${f.matchId ? esc(handle(f.matchId)) : '?'}</span></div>`).join('');
   const counts = {}; Object.values(p.reactions || {}).forEach(r => counts[r] = (counts[r] || 0) + 1);
   const mine = p.reactions?.[ME];
   let acts = '';
@@ -1445,20 +1657,32 @@ async function drawViewer(){
   else if (!d && isUncat(p) && eventMembers(e).includes(ME)) acts = `<button class="btn fill" onclick="claim('${pid}')">I'm In This One</button>`;
   acts += `<button class="btn" onclick="savePhoto('${pid}')">Save</button>`;
   if (p.uploaderId === ME || isAdminNow()) acts +=`<button class="btn red" onclick="deletePhoto('${pid}')">Delete</button>`;
+  const keepVid = p.kind === 'video' && $('#vvid')?.dataset.pid === pid && $('#vvid').src ? $('#vvid') : null;   // don't restart a playing video when reactions change
+  const keepMore = $('#rxmore');
   $('#viewer').innerHTML = `
     <div class="vtop"><button onclick="closeViewer()" aria-label="Close">✕</button>
       <div class="vt">${esc(e?.name || '')}<div class="vs">${esc(handle(p.uploaderId))} · ${ago(p.createdAt)}${vList.length > 1 ? ` · ${vIdx + 1} of ${vList.length}` : ''}</div></div>
       <button onclick="vBoxes=!vBoxes;$('.vimg').classList.toggle('hidebox',!vBoxes)" aria-label="Show Names" style="font-size:13px;font-weight:700">@</button></div>
-    <div class="vimg ${vBoxes ? '' : 'hidebox'}">${vList.length > 1 ? `<button class="varrow" style="left:16px" onclick="step(-1)" aria-label="Previous">‹</button><button class="varrow" style="right:16px" onclick="step(1)" aria-label="Next">›</button>` : ''}<div class="vwrap"><img src="${fullCache.get(pid) || p.thumb}" id="vimg" alt="">${boxes}</div></div>
-    <div class="vbot"><div class="rxbar">${REACTS.map(r => `<button class="${mine === r ? 'on' : ''}" onclick="react('${pid}','${r}')">${r}${counts[r] ? `<small>${counts[r]}</small>` : ''}</button>`).join('')}</div>
+    <div class="vimg ${vBoxes ? '' : 'hidebox'}">${vList.length > 1 ? `<button class="varrow" style="left:16px" onclick="vStep(-1)" aria-label="Previous">‹</button><button class="varrow" style="right:16px" onclick="vStep(1)" aria-label="Next">›</button>` : ''}<div class="vwrap">${p.kind === 'video' ? `<video id="vvid" data-pid="${pid}" controls playsinline autoplay poster="${fullCache.get(pid) || p.thumb}"></video><div class="vload" id="vload">Loading video…</div>` : `<img src="${fullCache.get(pid) || p.thumb}" id="vimg" alt="">${boxes}`}</div></div>
+    <div class="vbot"><div class="rxbar">${[...new Set([...REACTS, ...Object.keys(counts)])].map(r => `<button class="${mine === r ? 'on' : ''}" onclick="react('${pid}','${r}')">${r}${counts[r] ? `<small>${counts[r]}</small>` : ''}</button>`).join('')}<button class="rxplus" onclick="rxMore('${pid}')" aria-label="More Emojis">+</button></div>
       <div class="vact">${acts}</div></div>`;
-  const full = await getFull(pid); if (full && vList[vIdx] === pid && $('#vimg')) $('#vimg').src = full;
+  if (keepMore) $('#viewer .vbot')?.prepend(keepMore);
+  if (keepVid){ $('#vvid').replaceWith(keepVid); $('#vload')?.remove(); }
+  else if (p.kind === 'video') getVideo(p).then(u => { const v = $('#vvid'); if (v && vList[vIdx] === pid){ v.src = u; $('#vload')?.remove(); v.play().catch(() => {}); } }).catch(() => { const l = $('#vload'); if (l) l.textContent = "Couldn't load this video."; });
+  else { const full = await getFull(pid); if (full && vList[vIdx] === pid && $('#vimg')) $('#vimg').src = full; }
   const area = $('.vimg'); let sx = null;
   area.ontouchstart = ev => sx = ev.touches[0].clientX;
-  area.ontouchend = ev => { if (sx == null) return; const dx = ev.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1); };
+  area.ontouchend = ev => { if (sx == null) return; const dx = ev.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 50) vStep(dx < 0 ? 1 : -1); };
 }
-function step(n){ const i = vIdx + n; if (i < 0 || i >= vList.length) return; vIdx = i; drawViewer(); }
-document.addEventListener('keydown', e => { if (!$('#viewer').classList.contains('show')) return; if (e.key === 'ArrowRight') step(1); if (e.key === 'ArrowLeft') step(-1); if (e.key === 'Escape') closeViewer(); });
+// Any emoji as a reaction: + opens the full picker above the reaction bar.
+function rxMore(pid){
+  const old = $('#rxmore'); if (old){ old.remove(); return; }
+  const d = document.createElement('div'); d.id = 'rxmore'; d.className = 'rxmore';
+  d.innerHTML = emojiGrid('', e => { d.remove(); emoCb = null; react(pid, e); });
+  $('#viewer .vbot')?.prepend(d);
+}
+function vStep(n){ const i = vIdx + n; if (i < 0 || i >= vList.length) return; vIdx = i; drawViewer(); }
+document.addEventListener('keydown', e => { if (!$('#viewer').classList.contains('show')) return; if (e.key === "ArrowRight") vStep(1); if (e.key === "ArrowLeft") vStep(-1); if (e.key === 'Escape') closeViewer(); });
 
 /* ---------- profile ---------- */
 function editProfileSheet(){
@@ -1469,9 +1693,24 @@ function editProfileSheet(){
       <label><span>First Name</span><input id="p-first" value="${esc(u.first)}"></label>
       <label><span>Last Initial</span><input id="p-last" value="${esc(u.last)}" maxlength="1" oninput="this.value=this.value.replace(/[^a-z]/gi,'').toUpperCase()"></label>
       <label><span>Username</span><span class="at">@</span><input id="p-user" value="${esc(u.username)}" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
-      <label><span>Bio</span><input id="p-bio" value="${esc(u.bio || '')}" maxlength="80" placeholder="Optional"></label>
     </div>
-    <div class="sechead" style="margin-top:6px">Your Emoji</div>${emojiGrid(u.emoji || '')}`);
+    <div class="sechead" style="margin-top:6px">About You</div>
+    <div class="field"><label class="tall"><textarea id="p-bio" maxlength="300" rows="4" placeholder="A few lines about you. Optional." oninput="$('#p-bio-n').textContent=300-this.value.length">${esc(u.bio || '')}</textarea></label></div>
+    <div class="fnote" style="margin:-6px 6px 12px;text-align:right"><span id="p-bio-n">${300 - (u.bio || '').length}</span> left</div>
+    <div class="field">
+      <label><span>Pronouns</span><input id="p-pro" value="${esc(u.pronouns || '')}" maxlength="20" placeholder="Optional, like she/her"></label>
+      <label><span>Lives In</span><input id="p-city" value="${esc(u.city || '')}" maxlength="40" placeholder="Optional"></label>
+      <label><span>Instagram</span><span class="at">@</span><input id="p-ig" value="${esc(u.instagram || '')}" maxlength="30" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Optional"></label>
+      <label><span>Birthday</span><input id="p-bday" type="date" value="${esc(u.birthday || '')}"></label>
+    </div>
+    <div class="sechead" style="margin-top:6px">Your Emoji</div>${emojiGrid(u.emoji || '')}
+    <div class="list" style="margin-top:6px"><button class="cell tap" onclick="closeSheet();setTimeout(faceSheet,300)"><div class="main">Face Match Selfies</div><span class="val">${userDescs(u).length ? userDescs(u).length + ' of 5' : 'Not Set'}</span><span class="chev">›</span></button></div>`);
+}
+// Extra details shown under your name (only the ones filled in).
+function profileDetails(u){
+  const bday = u.birthday ? new Date(u.birthday + 'T12:00').toLocaleDateString(undefined, {month:'long', day:'numeric'}) : '';
+  const bits = [u.pronouns && esc(u.pronouns), u.city && esc(u.city), bday && 'Birthday ' + bday, u.instagram && `<a href="https://instagram.com/${encodeURIComponent(u.instagram)}" target="_blank" rel="noopener">@${esc(u.instagram)}</a>`].filter(Boolean);
+  return `${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}${bits.length ? `<div class="pdet">${bits.join('<i>·</i>')}</div>` : ''}`;
 }
 async function saveProfile(){
   const u = me(), first = $('#p-first').value.trim(), last = $('#p-last').value.trim().toUpperCase(), username = cleanUsername($('#p-user').value);
@@ -1483,7 +1722,8 @@ async function saveProfile(){
       await claimUsername(username, ME, u.username);
       try { const old = await F.getDoc(ref('logins', u.username)); if (old.exists() && old.data().uid === AUTH.currentUser?.uid){ await F.setDoc(ref('logins', username), old.data()); await F.deleteDoc(ref('logins', u.username)); } } catch (e){ console.warn(e); }
     }
-    await F.updateDoc(ref('users', ME), {first:first[0].toUpperCase() + first.slice(1), last, username, bio:$('#p-bio').value.trim(), emoji:pickedEmoji, avatar:pickedAvatar || ''});
+    await F.updateDoc(ref('users', ME), {first:first[0].toUpperCase() + first.slice(1), last, username, bio:$('#p-bio').value.trim().slice(0, 300), emoji:pickedEmoji, avatar:pickedAvatar || '',
+      pronouns:$('#p-pro').value.trim(), city:$('#p-city').value.trim(), instagram:$('#p-ig').value.trim().replace(/^@/, '').replace(/\s/g, ''), birthday:$('#p-bday').value || ''});
     closeSheet(); toast('Profile saved.');
   } catch (e){ toast(typeof e === 'string' ? e : "Couldn't save. Try again."); }
 }
@@ -1514,7 +1754,7 @@ function otherProfile(id){
   if (id === ME) return tab('profile');
   const shared = Object.values(C.groups).filter(g => g.members.includes(id));
   openSheet(`${sheetHead(esc(fullName(u)))}
-    <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
+    <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${profileDetails(u)}</div>
     ${shared.length ? `<div class="sechead">Groups Together</div><div class="list">${shared.map(g => `<button class="cell tap" onclick="closeSheet();go({name:'group',id:'${g.id}'})">${sq(g)}<div class="main"><div class="t">${esc(g.name)}</div></div><span class="chev">›</span></button>`).join('')}</div>` : ''}`);
 }
 async function deleteAccount(){
@@ -1552,11 +1792,11 @@ const ICONS = {
 };
 function tabbar(){
   const n = pending().length + openReqsIn().length, b = (k, l) => `<button class="${view.name === 'tab' && view.tab === k ? 'on' : ''}" onclick="tab('${k}')">${ICONS[k]}${l}${k === 'inbox' && n ? `<span class="dot">${n}</span>` : ''}</button>`;
-  return `<nav class="tabbar"><div class="sbrand"><img src="icon-192.png" alt="">InFrame</div>${b('inbox', 'Inbox')}${b('photos', 'Photos')}${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
+  return `<nav class="tabbar"><div class="sbrand"><img src="icon-192.png" alt="">InFrame</div>${b('inbox', 'Inbox')}${b('photos', 'Photos')}<button class="postbtn" onclick="postSheet()" aria-label="Post Photos">${ICONS.plus}<span>Post</span></button>${b('groups', 'Groups')}${b('profile', 'Profile')}</nav>`;
 }
 function bell(){ const n = unreadCount(); return `<button class="iconbtn" onclick="go({name:'alerts'})" aria-label="Notifications">${ICONS.bell}${n ? `<span class="dot">${n}</span>` : ''}</button>`; }
 function topBar(title, right){ return `<div class="nav"><button class="back" onclick="back()">${chevron} Back</button><div class="ttl">${esc(title || '')}</div><span class="spacer"></span>${right || ''}</div>`; }
-const tileHTML = (p, list, tag) => `<button class="tile" onclick="openViewer('${p.id}',${esc(JSON.stringify(list))})"><img src="${p.thumb}" alt="" loading="lazy">${tag ? `<span class="tag">${tag}</span>` : ''}${Object.keys(p.reactions || {}).length ? `<span class="rx">${[...new Set(Object.values(p.reactions))].slice(0, 3).join('')}</span>` : ''}</button>`;
+const tileHTML = (p, list, tag) => `<button class="tile" onclick="openViewer('${p.id}',${esc(JSON.stringify(list))})"><img src="${p.thumb}" alt="" loading="lazy">${p.kind === 'video' ? `<span class="vmark">▶ ${fmtDur(p.dur)}</span>` : ''}${tag ? `<span class="tag">${tag}</span>` : ''}${Object.keys(p.reactions || {}).length ? `<span class="rx">${[...new Set(Object.values(p.reactions))].slice(0, 3).join('')}</span>` : ''}</button>`;
 // Android / Chrome / Edge offer a real install prompt; iPhone needs Share → Add to Home Screen.
 let installEvt = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; later(); });
@@ -1577,7 +1817,7 @@ function screenInbox(){
     ${reqs.length ? `<div class="sechead" style="margin-top:4px">Photo Requests</div>${reqs.map(requestCard).join('')}${items.length ? '<div class="sechead">Photos Of You</div>' : ''}` : ''}
     ${items.length ? `<div class="ibgrid">${items.map(p => `<article class="ib">
         <div class="ib-h">${avatar(user(p.uploaderId), 34, true)}<div class="main"><b>${esc(handle(p.uploaderId))}</b><span>${esc(evt(p.eventId)?.name || 'Event')} · ${ago(p.createdAt)}</span></div></div>
-        <button class="ib-ph" onclick="openViewer('${p.id}',${esc(JSON.stringify(ids))})"><img src="${p.thumb}" alt="" loading="lazy"></button>
+        <button class="ib-ph" onclick="openViewer('${p.id}',${esc(JSON.stringify(ids))})"><img src="${p.thumb}" alt="" loading="lazy">${p.kind === 'video' ? `<span class="vmark big">▶ ${fmtDur(p.dur)}</span>` : ''}</button>
         <div class="ib-a"><button class="btn fill" onclick="decide('${p.id}','keep')">Keep</button><button class="btn line" onclick="decide('${p.id}','skip')">Skip</button><button class="btn line" onclick="decide('${p.id}','notme')">Not Me</button></div>
       </article>`).join('')}</div>`
     : reqs.length ? '' : `<div class="empty">${emptyArt()}<b>All caught up</b>When friends upload photos you're in, they'll land here.</div>`}</div>`;
@@ -1637,7 +1877,7 @@ function screenEvent(){
     ${membersRow(eventMembers(e))}
     <div class="content">
     ${openReqsIn().filter(r => r.eventId === e.id).map(r => `<div class="callout" style="margin-top:12px"><div style="flex:1"><b>${esc(handle(r.fromId))}</b> asked for your photos from this event${r.note ? `: “${esc(r.note)}”` : '.'}</div></div>`).join('')}
-    <div class="row" style="margin-top:12px;flex-wrap:nowrap"><label class="btn fill" style="flex:1;padding:15px;border-radius:14px">Upload Photos<input type="file" accept="image/*" multiple hidden onchange="upload('${e.id}',this.files)"></label>
+    <div class="row" style="margin-top:12px;flex-wrap:nowrap"><label class="btn fill" style="flex:1;padding:15px;border-radius:14px">Upload<input type="file" accept="image/*,video/*" multiple hidden onchange="upload('${e.id}',this.files)"></label>
       <button class="btn tint" style="flex:1;padding:15px;border-radius:14px" onclick="requestSheet('${e.id}')">Request Photos</button></div>
     ${waitingOn(e.id).length ? `<div class="fnote" style="margin:8px 4px 0">Waiting on ${waitingOn(e.id).map(id => esc(handle(id))).join(', ')} to upload.</div>` : ''}
     ${me()?.descriptor ? '' : `<div class="callout" style="margin-top:12px"><div style="flex:1">You don't have a face selfie yet, so photos of you won't be found automatically. <a href="#" onclick="faceSheet();return false" style="color:var(--accent)">Add Selfie</a></div></div>`}
@@ -1656,13 +1896,16 @@ function screenProfile(){
   const u = me(), photosOfMe = Object.values(C.deliveries).filter(d => d.status === 'approved').length, ups = Object.values(C.photos).filter(p => p.uploaderId === ME).length;
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
   return `<div class="nav"><span class="spacer"></span>${bell()}</div>
-    <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${u.bio ? `<div class="bio">${esc(u.bio)}</div>` : ''}</div>
+    <div class="prof">${avatar(u, 104, true)}<div class="nm">${esc(fullName(u))}</div><div class="un">@${esc(u.username)}</div>${profileDetails(u)}</div>
     <div class="content"><div class="stats"><div><b>${photosOfMe}</b><span>Photos Of Me</span></div><div><b>${ups}</b><span>Uploads</span></div><div><b>${Object.keys(C.groups).length}</b><span>Groups</span></div></div>
     <div style="height:24px"></div>
     ${isAdminNow() ? `<div class="list"><button class="cell tap" onclick="ADM=null;go({name:'admin',seg:'overview'})"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px;background:var(--accent);color:#fff">A</span><div class="main">Admin Panel</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
     <div class="list"><button class="cell tap" onclick="editProfileSheet()"><div class="main">Edit Profile</div><span class="chev">›</span></button>
       <button class="cell tap" onclick="faceSheet()"><div class="main">Face Match Selfies</div><span class="val">${userDescs(u).length ? userDescs(u).length + ' of 5' : 'Not Set'}</span><span class="chev">›</span></button>
       <button class="cell tap" onclick="${perm === 'granted' ? "toast('Notifications are on. Turn them off in your phone\\'s Settings.')" : 'enableNotifications()'}"><div class="main">Notifications</div><span class="val">${perm === 'granted' ? 'On' : 'Off'}</span><span class="chev">›</span></button></div>
+    <div class="sechead">Appearance</div>
+    <div class="seg" style="margin:0 0 4px">${[['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button class="${themeNow() === k ? 'on' : ''}" onclick="setTheme('${k}')">${l}</button>`).join('')}</div>
+    <div class="fnote" style="margin:0 6px">Automatic follows your phone's setting.</div>
     <div style="height:24px"></div>
     <div class="list"><div class="cell"><div class="main">Logged In As</div><span class="val" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(AUTH?.currentUser?.email || '')}</span></div>
       <a class="cell tap" href="terms.html" target="_blank" style="color:inherit;text-decoration:none"><div class="main">Terms & Privacy</div><span class="chev">›</span></a></div>

@@ -36,6 +36,8 @@ service cloud.firestore {
     match /inframe_events/{id} { allow read, write: if signedIn(); }
     match /inframe_photos/{id} { allow read, write: if signedIn(); }
     match /inframe_images/{id} { allow read, write: if signedIn(); }
+    // short videos, saved in pieces under 1 MB each
+    match /inframe_vchunks/{id} { allow read, write: if signedIn(); }
     match /inframe_deliveries/{id} { allow read, write: if signedIn(); }
     match /inframe_notifications/{id} { allow read, write: if signedIn(); }
     match /inframe_requests/{id} { allow read, write: if signedIn(); }
