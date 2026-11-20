@@ -196,6 +196,13 @@ body.dropping #app{outline:3px dashed var(--accent);outline-offset:-10px;border-
 .sc-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
 .sc-ring circle{fill:none;stroke:rgba(243,239,231,.18);stroke-width:3;stroke-linecap:round;transition:stroke .3s}
 .sc-ring circle.on{stroke:var(--accent)}
+.sc-ring circle.fill{stroke:var(--accent);transition:stroke-dasharray .15s linear}
+.sc-msg{transition:opacity .15s}
+.sc-arrow{position:absolute;top:50%;font-size:44px;color:#fff;opacity:0;transform:translateY(-50%);transition:opacity .2s;text-shadow:0 2px 10px rgba(0,0,0,.5);pointer-events:none}
+.sc-arrow.show{opacity:.9}
+.sc-arrow.left{left:-6%;animation:scl 1s ease-in-out infinite}.sc-arrow.right{right:-6%;animation:scr 1s ease-in-out infinite}
+.sc-arrow.up{top:-4%;left:50%;transform:translateX(-50%);animation:scu 1s ease-in-out infinite}.sc-arrow.down{top:auto;bottom:-6%;left:50%;transform:translateX(-50%);animation:scd 1s ease-in-out infinite}
+@keyframes scl{50%{margin-left:-12px}}@keyframes scr{50%{margin-right:-12px}}@keyframes scu{50%{margin-top:-12px}}@keyframes scd{50%{margin-bottom:-12px}}
 .sc-msg{font:700 24px var(--display);letter-spacing:-.02em;max-width:320px;min-height:58px}
 .sc-sub{color:#A39C90;font-size:15px;margin-top:-10px}
 #scan .cancel{position:absolute;left:20px;top:calc(var(--sat) + 16px);border:0;background:rgba(243,239,231,.12);color:#F3EFE7;font-size:15px;font-weight:600;padding:8px 16px;border-radius:99px}
@@ -469,7 +476,7 @@ body.dropping #app{outline:3px dashed var(--accent);outline-offset:-10px;border-
 <div id="viewer"></div>
 <div id="cam"><video id="cam-v" autoplay playsinline muted></video><button class="shutter" onclick="snap()" aria-label="Take Photo"></button><button class="cancel" onclick="closeCamera()">Cancel</button></div>
 <div id="scan"><button class="cancel" onclick="stopScan()">Cancel</button>
-  <div class="sc-stage" id="sc-stage"><video id="scan-v" autoplay playsinline muted></video><div class="fl"></div><svg class="sc-ring" viewBox="0 0 100 100" id="sc-ring"></svg></div>
+  <div class="sc-stage" id="sc-stage"><video id="scan-v" autoplay playsinline muted></video><div class="fl"></div><svg class="sc-ring" viewBox="0 0 100 100" id="sc-ring"></svg><div class="sc-arrow" id="sc-arrow"></div></div>
   <div class="sc-msg" id="scan-msg">Getting the camera ready…</div><div class="sc-sub" id="scan-sub"></div><button class="cancel" id="scan-skip" style="position:static;display:none" onclick="if(scanning)scanning.skip=true">Skip This One</button></div>
 <div id="banner" onclick="bannerTap()"></div>
 <div id="busy"></div>
@@ -718,7 +725,7 @@ function renderAuth(){
     <div class="grow"></div><p class="hint" style="margin-top:22px">New to InFrame? <a href="#" onclick="showAuth('signup');return false" style="color:var(--link);font-weight:600">Create Account</a></p></div>`;
   else if (authScreen === 'signup') html = `<div class="onb" id="auth">
     <button class="back plain" onclick="showAuth('welcome')">${chevron} Back</button>
-    <img class="logo" src="icon-192.png" alt=""><h1>Create Account</h1><p class="hint">Start with your email. You'll set up your profile and selfie next.</p>${invited}
+    <img class="logo" src="icon-192.png" alt=""><h1>Create Account</h1><p class="hint">Start with your email. You'll set up your profile and face scan next.</p>${invited}
     ${fields('At least 8 characters', 'new-password')}
     <button class="btn fill full" id="au-go" onclick="doRegister()">Continue</button>${google}
     <div class="grow"></div><p class="hint" style="margin-top:22px">Already have an account? <a href="#" onclick="showAuth('login');return false" style="color:var(--link);font-weight:600">Log In</a></p></div>`;
@@ -1109,18 +1116,12 @@ function snap(){
 const MAX_SELFIES = 5;
 let faces = []; // [{descriptor, thumb}] — up to 5 selfies; more angles = better matching
 function faceGrid(err, scanning){
-  const slots = faces.map((f, i) => `<div class="fslot"><img src="${f.thumb}" alt=""><button onclick="faces.splice(${i},1);drawFaces()" aria-label="Remove">✕</button></div>`).join('')
-    + (faces.length < MAX_SELFIES ? Array.from({length:MAX_SELFIES - faces.length}, (_, i) => `<div class="fslot empty">${i === 0 && scanning ? '<span class="spin"></span>' : ''}</div>`).join('') : '');
-  const fromScan = faces.length >= MAX_SELFIES;
-  const pick = `<div class="fchoice">
-      <button class="fopt rec" onclick="startScan()"><b>Face Scan</b><span>5 quick shots as you turn your head. Best matches.</span><i>Recommended</i></button>
-      <button class="fopt" onclick="openCamera(processFace)"><b>Take A Selfie</b><span>One photo. Quickest.</span></button></div>
-    <label class="link" style="cursor:pointer;margin-top:6px">or choose photos from your phone<input type="file" accept="image/*" multiple hidden onchange="addFaceFiles(this.files)"></label>`;
-  const add = !faces.length ? pick
-    : fromScan ? `<button class="link" onclick="faces=[];drawFaces()">Start over</button>`
-    : `<div class="row" style="justify-content:center;gap:4px;margin-top:10px"><button class="link" style="margin:0" onclick="openCamera(processFace)">Add Another Selfie</button><span style="color:var(--muted)">·</span><button class="link" style="margin:0" onclick="startScan()">Do A Face Scan Instead</button></div>`;
-  const tip = !faces.length ? '' : fromScan ? 'Face scan saved. You\'re all set.' : `${plural(faces.length, 'selfie')} added. More angles help, up to ${MAX_SELFIES}.`;
-  return `${faces.length ? `<div class="fslots">${slots}</div>` : ''}${add}${tip ? `<div class="fnote" style="margin:12px 0 0;text-align:center">${tip}</div>` : ''}${err ? `<div class="err">${esc(err)}</div>` : ''}`;
+  const slots = faces.map(f => `<div class="fslot"><img src="${f.thumb}" alt=""></div>`).join('');
+  const body = !faces.length
+    ? `<button class="btn fill full" style="padding:16px;border-radius:16px" onclick="startScan()">Start Face Scan</button>
+       <div class="fnote" style="margin:10px 0 0;text-align:center">Takes about 10 seconds. Look at the camera, then slowly turn your head when it asks.</div>`
+    : `<div class="fslots">${slots}</div><div class="fnote" style="margin:12px 0 0;text-align:center">Face scan saved. You're all set.</div><button class="link" onclick="startScan()">Scan Again</button>`;
+  return `${scanning ? '<div style="text-align:center;padding:12px"><span class="spin"></span></div>' : body}${err ? `<div class="err">${esc(err)}</div>` : ''}`;
 }
 function drawFaces(err, scanning){ const b = $('#facebox'); if (b) b.innerHTML = faceGrid(err, scanning); }
 async function addFaceFiles(list){ for (const f of [...list].slice(0, MAX_SELFIES - faces.length)) await processFace(f); }
@@ -1144,72 +1145,83 @@ function headPose(lm){
   const ed = Math.hypot(re.x - le.x, re.y - le.y) || 1;
   return {yaw:(nose.x - mid.x) / ed, pitch:(nose.y - mid.y) / ((mouth.y - mid.y) || 1)};
 }
-function drawRing(done){
+// 5 ring segments: finished ones are orange, the current one fills up while you hold the pose.
+function drawRing(done, part){
   const C = 2 * Math.PI * 47, seg = C / 5;
-  $('#sc-ring').innerHTML = Array.from({length:5}, (_, i) => `<circle cx="50" cy="50" r="47" class="${i < done ? 'on' : ''}" stroke-dasharray="${seg - 5} ${C}" stroke-dashoffset="${-i * seg}"/>`).join('');
+  $('#sc-ring').innerHTML = Array.from({length:5}, (_, i) => `<circle cx="50" cy="50" r="47" class="${i < done ? 'on' : ''}" stroke-dasharray="${seg - 5} ${C}" stroke-dashoffset="${-i * seg}"/>`).join('')
+    + (part > 0 && done < 5 ? `<circle cx="50" cy="50" r="47" class="fill" stroke-dasharray="${(seg - 5) * Math.min(1, part)} ${C}" stroke-dashoffset="${-done * seg}"/>` : '');
 }
 async function startScan(){
   if (!window.faceapi || !faceapi.nets.faceRecognitionNet.isLoaded) toast('Loading the face scanner, one sec…');
-  try { await ensureModels(); } catch (e){ return toast(e); }
+  try { await ensureModels(); if (!faceapi.nets.tinyFaceDetector.isLoaded) await faceapi.nets.tinyFaceDetector.loadFromUri(FACEAPI + 'model/'); } catch (e){ return toast(typeof e === 'string' ? e : 'Could not load the face scanner. Check your connection.'); }
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:960}}}); }
-  catch { return toast('Camera not available. Use Choose Photos instead.'); }
+  try { stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}, height:{ideal:720}}}); }
+  catch { return toast('Camera not available. Allow camera access for InFrame in Settings, then try again.'); }
   pushNav(); $('#scan').classList.add('show');
   const v = $('#scan-v'); v.srcObject = stream; try { await Promise.race([v.play(), new Promise(r => setTimeout(r, 1500))]); } catch {}
-  /* Each shot is only taken once you're really in that pose and hold it for a moment. It never snaps on a timer.
+  /* A fast tracker follows your head live; each shot is only taken once you're really in the pose and hold it briefly (never on a timer).
      The preview is mirrored, so "left" means toward the left side of the screen. */
   const steps = [
-    ['straight', 'Look straight at the camera', ''],
-    ['left', 'Turn your head to the left', '←'],
-    ['right', 'Now turn to the right', '→'],
-    ['up', 'Tilt your chin up', '↑'],
-    ['down', 'Tilt your chin down', '↓'],
+    ['straight', 'Look straight at the camera', '', 0, 0],
+    ['left', 'Slowly turn your head left', '←', -14, 0],
+    ['right', 'Now slowly turn right', '→', 14, 0],
+    ['up', 'Tilt your chin up a little', '↑', 0, -14],
+    ['down', 'Now tilt your chin down', '↓', 0, 14],
   ];
-  const HOLD = 3, TURN = .2, TILT = .08;   // frames to hold still; how far to turn / tilt
+  const HOLD = 4, TURN = .17, TILT = .07;
   const got = [], c = document.createElement('canvas'), me_ = scanning = {stream, stop:false};
-  const say = (m, sub) => { $('#scan-msg').textContent = m; $('#scan-sub').textContent = sub; };
+  const tiny = new faceapi.TinyFaceDetectorOptions({inputSize:256, scoreThreshold:.45});
+  let lastMsg = '', pendMsg = '', pendN = 0;
+  // only change the words once the same hint shows twice in a row, so it doesn't flicker
+  const say = (m, sub, now) => { if (m !== lastMsg){ if (!now && m !== pendMsg){ pendMsg = m; pendN = 1; return; } if (!now && ++pendN < 2) return; lastMsg = m; $('#scan-msg').textContent = m; } $('#scan-sub').textContent = sub; };
+  const arrow = i => { const a = $('#sc-arrow'), st = steps[i]; if (!a) return; a.textContent = st?.[2] || ''; a.className = 'sc-arrow' + (st?.[2] ? ' show ' + st[0] : ''); };
   let i = 0, stepStart = Date.now(), basePitch = null, held = 0, best = null;
-  const ask = (extra) => say(`${steps[i][1]} ${steps[i][2]}`.trim(), extra || `${i + 1} of 5`);
-  drawRing(0); ask();
+  const ask = extra => say(steps[i][1], extra || `${i + 1} of 5`, true);
+  drawRing(0, 0); ask(); arrow(0);
   while (!me_.stop && i < steps.length){
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(r => requestAnimationFrame(r));
     $('#scan-skip').style.display = i > 0 && Date.now() - stepStart > 7000 ? '' : 'none';
-    if (me_.skip){ me_.skip = false; i++; held = 0; best = null; drawRing(i); stepStart = Date.now(); if (i < steps.length) ask(); continue; }
+    if (me_.skip){ me_.skip = false; i++; held = 0; best = null; drawRing(i, 0); stepStart = Date.now(); if (i < steps.length){ ask(); arrow(i); } continue; }
     if (!v.videoWidth) continue;
-    const k = Math.min(1, 560 / Math.max(v.videoWidth, v.videoHeight)); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+    const k = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight)); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
     const x = c.getContext('2d'); x.setTransform(-1, 0, 0, 1, c.width, 0); x.drawImage(v, 0, 0, c.width, c.height); x.setTransform(1, 0, 0, 1, 0, 0);
-    let d; try { d = await faceapi.detectAllFaces(c, new faceapi.SsdMobilenetv1Options({minConfidence:.6})).withFaceLandmarks().withFaceDescriptors(); } catch { continue; }
+    let f; try { f = await faceapi.detectSingleFace(c, tiny).withFaceLandmarks(); } catch { continue; }
     if (me_.stop) break;
-    const miss = m => { held = 0; best = null; say(m, `${i + 1} of 5`); };
-    if (d.length !== 1){ miss(d.length ? 'Just you in the frame, please' : 'Put your face inside the circle'); continue; }
-    const f = d[0], box = f.detection.box, cx = (box.x + box.width / 2) / c.width, cy = (box.y + box.height / 2) / c.height;
-    if (box.width < c.width * .18){ miss('Move a little closer'); continue; }
-    if (box.width > c.width * .75){ miss('Move back a little'); continue; }
-    if (Math.abs(cx - .5) > .22 || Math.abs(cy - .5) > .25){ miss('Center your face in the circle'); continue; }
+    const miss = m => { held = 0; best = null; drawRing(i, 0); say(m, `${i + 1} of 5`); };
+    if (!f){ miss('Put your face inside the circle'); continue; }
+    const box = f.detection.box, cx = (box.x + box.width / 2) / c.width, cy = (box.y + box.height / 2) / c.height;
+    if (box.width < c.width * .16){ miss('Move a little closer'); continue; }
+    if (box.width > c.width * .8){ miss('Move back a little'); continue; }
+    if (Math.abs(cx - .5) > .24 || Math.abs(cy - .5) > .27){ miss('Center your face in the circle'); continue; }
     const pose = headPose(f.landmarks), kind = steps[i][0], yaw = pose.yaw, tilt = basePitch == null ? 0 : pose.pitch - basePitch;
     let ok = false, hint = '';
-    if (kind === 'straight'){ ok = Math.abs(yaw) < .07; hint = 'Face the camera straight on'; }
+    if (kind === 'straight'){ ok = Math.abs(yaw) < .08; hint = 'Face the camera straight on'; }
     else if (kind === 'left' || kind === 'right'){
       const want = kind === 'left' ? -1 : 1, amt = yaw * want;
-      ok = amt > TURN && Math.abs(tilt) < .15;
+      ok = amt > TURN && Math.abs(tilt) < .16;
       hint = amt < -.05 ? `Other way ${steps[i][2]}` : amt > TURN * .45 ? `A little further ${steps[i][2]}` : '';
     } else {
       const want = kind === 'up' ? -1 : 1, amt = tilt * want;
-      ok = amt > TILT && Math.abs(yaw) < .14;
-      hint = Math.abs(yaw) >= .14 ? 'Keep your face pointed at the camera' : amt < -.03 ? `Other way ${steps[i][2]}` : amt > TILT * .45 ? `A little more ${steps[i][2]}` : '';
+      ok = amt > TILT && Math.abs(yaw) < .15;
+      hint = Math.abs(yaw) >= .15 ? 'Keep your face pointed at the camera' : amt < -.03 ? `Other way ${steps[i][2]}` : amt > TILT * .45 ? `A little more ${steps[i][2]}` : '';
     }
-    if (!ok){ held = 0; best = null; ask(hint || (Date.now() - stepStart > 8000 ? 'Take your time. It snaps when you get there.' : '')); continue; }
-    held++; if (!best || f.detection.score > best.f.detection.score) best = {f, thumb:squareCrop(c, 240, box), pitch:pose.pitch};
-    if (held < HOLD){ say('Hold still…', `${i + 1} of 5`); continue; }
+    if (!ok){ held = 0; best = null; drawRing(i, 0); say(hint || steps[i][1], Date.now() - stepStart > 8000 ? 'Take your time. It snaps when you get there.' : `${i + 1} of 5`); continue; }
+    held++; drawRing(i, held / HOLD);
+    if (!best || f.detection.score > best.score){ const snap = document.createElement('canvas'); snap.width = c.width; snap.height = c.height; snap.getContext('2d').drawImage(c, 0, 0); best = {snap, box, score:f.detection.score, pitch:pose.pitch}; }
+    if (held < HOLD){ say('Hold still…', `${i + 1} of 5`, true); continue; }
+    // got the pose: read the face template from the best frame (the detailed check runs only here, so the live view stays smooth)
+    let d; try { d = await faceapi.detectSingleFace(best.snap, new faceapi.SsdMobilenetv1Options({minConfidence:.4})).withFaceLandmarks().withFaceDescriptor(); } catch {}
+    if (!d){ held = 0; best = null; drawRing(i, 0); continue; }
     if (kind === 'straight') basePitch = best.pitch;
-    got.push({descriptor:Array.from(best.f.descriptor), thumb:best.thumb});
-    i++; held = 0; best = null; drawRing(i); stepStart = Date.now();
+    got.push({descriptor:Array.from(d.descriptor), thumb:squareCrop(best.snap, 240, d.detection.box)});
+    i++; held = 0; best = null; drawRing(i, 0); stepStart = Date.now();
     const st = $('#sc-stage'); st.classList.add('flash'); setTimeout(() => st.classList.remove('flash'), 120);
     try { navigator.vibrate?.(30); } catch {}
-    if (i < steps.length) ask();
+    if (i < steps.length){ ask(); arrow(i); }
   }
+  arrow(99);
   const finished = !me_.stop; stopScan(); $('#scan-skip').style.display = 'none';
-  if (got.length){ faces = got.slice(0, MAX_SELFIES); drawFaces(); toast(finished && got.length === 5 ? 'Face scan done. 5 shots saved.' : `Face scan saved with ${plural(got.length, 'shot')}.`); }
+  if (got.length){ faces = got.slice(0, MAX_SELFIES); drawFaces(); toast(finished && got.length === 5 ? 'Face scan done.' : `Face scan saved with ${plural(got.length, 'angle')}.`); }
 }
 function stopScan(){
   if (scanning){ scanning.stop = true; scanning.stream.getTracks().forEach(t => t.stop()); scanning = null; }
@@ -1226,7 +1238,7 @@ function avatarPicker(current, allowFace){
     <div class="row" style="justify-content:center">
       <button class="btn sm tint" onclick="openCamera(setAvatarFrom)">Take Photo</button>
       <label class="btn sm tint">Choose Photo<input type="file" accept="image/*" hidden onchange="this.files[0]&&setAvatarFrom(this.files[0])"></label>
-      ${allowFace ? `<button class="btn sm tint" onclick="pickedAvatar=${allowFace};$('#avimg').src=pickedAvatar">Use Selfie</button>` : ''}
+      <button class="btn sm tint" onclick="shuffleAvatar()" aria-label="Random Avatar">🎲 Shuffle</button>
     </div></div>`;
 }
 let pickedEmoji = '', pickedIcon = null;
@@ -1256,6 +1268,18 @@ function pickEmoji_(btn, e){
   if (emoCb) return emoCb(e);
   const on = pickedEmoji === e; btn.closest('.emo').querySelectorAll('.emojis button').forEach(b => b.classList.remove('on')); pickedEmoji = on ? '' : e; if (!on) btn.classList.add('on');
 }
+// A random cartoon avatar (an animal on a soft color) so nobody's face scan becomes their profile picture.
+const AV_EMOJI = ['🐶','🐱','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐧','🐦','🦉','🐙','🦄','🐝','🐢','🐬','🦋','🐰','🐹','🦒','🦘','🦦','🐳','🦩','🐿️','🦔'];
+const AV_BG = [['#FFD6A5','#FFB27A'],['#CDEAC0','#9ED8A0'],['#BDE0FE','#8EC5FC'],['#E4C1F9','#C49BF0'],['#FFC8DD','#FF9EBB'],['#FDFFB6','#F5E37A'],['#A0E7E5','#6FD3D0'],['#FFCFD2','#F7A1A6'],['#D0F4DE','#A7E3BD'],['#E2ECE9','#BFD8D2']];
+function randomAvatar(){
+  const c = document.createElement('canvas'); c.width = c.height = 320; const x = c.getContext('2d');
+  const [a, b] = AV_BG[Math.floor(Math.random() * AV_BG.length)], g = x.createLinearGradient(0, 0, 320, 320);
+  g.addColorStop(0, a); g.addColorStop(1, b); x.fillStyle = g; x.fillRect(0, 0, 320, 320);
+  x.font = '170px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(AV_EMOJI[Math.floor(Math.random() * AV_EMOJI.length)], 160, 172);
+  return c.toDataURL('image/jpeg', .85);
+}
+function shuffleAvatar(){ pickedAvatar = randomAvatar(); const i = $('#avimg'); if (i) i.src = pickedAvatar; }
 function blankAvatar(){ return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e5ea"/><circle cx="50" cy="40" r="18" fill="#aeaeb2"/><path d="M18 92c4-18 17-28 32-28s28 10 32 28" fill="#aeaeb2"/></svg>'); }
 
 /* ---------- usernames ---------- */
@@ -1290,15 +1314,15 @@ function renderSignup(){
     <button class="btn fill full" onclick="suNext1()">Continue</button>
     <button class="link" onclick="logOut()">Log Out</button>`;
   if (su.step === 2) body = `
-    <h1>Face Scan</h1><p class="hint">Pick one so InFrame can find you in friends' photos. It's only used for matching and never posted.</p>${steps}
+    <h1>Face Scan</h1><p class="hint">A quick scan so InFrame can find you in friends' photos. It's only used for matching and never posted.</p>${steps}
     <div class="box" id="facebox">${faceGrid()}</div>
     <label class="check"><input type="checkbox" id="su-bio"><span>I agree that InFrame may create a face template from my selfies and use it only to find me in photos shared in my groups and events. It will never be sold or used to train or test AI. See the <a href="terms.html#biometric" target="_blank">Biometric Data Policy</a>.</span></label>
     <div class="grow"></div>
     <button class="btn fill full" onclick="suNext2()">Continue</button>
     <button class="link" onclick="su.step=1;renderSignup()">Back</button>`;
   if (su.step === 3) body = `
-    <h1>Your Look</h1><p class="hint">Pick a profile picture and an emoji that's you.</p>${steps}
-    ${avatarPicker(pickedAvatar || faces[0].thumb, 'faces[0].thumb')}
+    <h1>Your Look</h1><p class="hint">Here's a random avatar to start. Shuffle it, or use your own photo any time.</p>${steps}
+    ${avatarPicker(pickedAvatar || (pickedAvatar = randomAvatar()), null)}
     <div class="sechead" style="margin-top:0">Your Emoji</div>${emojiGrid(pickedEmoji)}
     <div class="sechead" style="margin-top:6px">About You</div><div class="field"><label class="tall"><textarea id="su-bioline" maxlength="300" rows="3" placeholder="A few lines about you. Optional."></textarea></label></div>
     <label class="check"><input type="checkbox" id="su-terms"><span>I agree to the <a href="terms.html" target="_blank">Terms of Service and Privacy Policy</a>.</span></label>
@@ -1319,7 +1343,7 @@ async function suNext1(){
   su.step = 2; renderSignup();
 }
 function suNext2(){
-  if (!faces.length){ $('#facebox')?.scrollIntoView({behavior:'smooth', block:'center'}); return toast('Do the face scan or add a selfie first.'); }
+  if (!faces.length){ $('#facebox')?.scrollIntoView({behavior:'smooth', block:'center'}); return toast('Do the face scan first.'); }
   if (!$('#su-bio').checked){ const l = $('#su-bio').closest('label'); l.scrollIntoView({behavior:'smooth', block:'center'}); l.style.outline = '2px solid var(--accent)'; l.style.borderRadius = '12px'; return toast('Tick the box above Continue to agree to face matching.'); }
   su.bioConsent = Date.now(); su.step = 3; renderSignup();
 }
@@ -1336,7 +1360,7 @@ async function suCreate(){
     await F.setDoc(ref('users', id), {
       isAdmin:false,
       first:su.first[0].toUpperCase() + su.first.slice(1), last:su.last, username:su.username,
-      avatar:pickedAvatar || faces[0].thumb, emoji:pickedEmoji, bio:$('#su-bioline').value.trim(),
+      avatar:pickedAvatar || randomAvatar(), emoji:pickedEmoji, bio:$('#su-bioline').value.trim(),
       ...faceFields(),
       termsVersion:TERMS_VERSION, termsAcceptedAt:now, biometricConsentAt:su.bioConsent, createdAt:now,
     });
@@ -1999,7 +2023,7 @@ document.addEventListener('keydown', e => { if (!$('#viewer').classList.contains
 function editProfileSheet(){
   const u = me(); pickedAvatar = u.avatar || null;
   openSheet(`${sheetHead('Edit Profile', 'Save', 'saveProfile()')}
-    ${avatarPicker(u.avatar || blankAvatar(), u.faceThumb ? 'me().faceThumb' : null)}
+    ${avatarPicker(u.avatar || blankAvatar(), null)}
     <div class="field">
       <label><span>First Name</span><input id="p-first" value="${esc(u.first)}"></label>
       <label><span>Last Initial</span><input id="p-last" value="${esc(u.last)}" maxlength="1" oninput="this.value=this.value.replace(/[^a-z]/gi,'').toUpperCase()"></label>
@@ -2015,7 +2039,7 @@ function editProfileSheet(){
       <label><span>Birthday</span><input id="p-bday" type="date" value="${esc(u.birthday || '')}"></label>
     </div>
     <div class="sechead" style="margin-top:6px">Your Emoji</div>${emojiGrid(u.emoji || '')}
-    <div class="list" style="margin-top:6px"><button class="cell tap" onclick="closeSheet();setTimeout(faceSheet,300)"><div class="main">Face Match Selfies</div><span class="val">${userDescs(u).length ? userDescs(u).length + ' of 5' : 'Not Set'}</span><span class="chev">›</span></button></div>`);
+    <div class="list" style="margin-top:6px"><button class="cell tap" onclick="closeSheet();setTimeout(faceSheet,300)"><div class="main">Face Scan</div><span class="val">${userDescs(u).length ? 'Done' : 'Not Set'}</span><span class="chev">›</span></button></div>`);
 }
 // Extra details shown under your name (only the ones filled in).
 function profileDetails(u){
@@ -2042,18 +2066,18 @@ async function saveProfile(){
 function faceSheet(){
   const u = me(), descs = userDescs(u), thumbs = u.faceThumbs || (u.faceThumb ? [u.faceThumb] : []);
   faces = descs.map((d, i) => ({descriptor:d, thumb:thumbs[i] || thumbs[0] || blankAvatar()})).slice(0, MAX_SELFIES);
-  openSheet(`${sheetHead('Face Match Selfies', 'Save', 'saveFace()')}
-    <p class="hint">Up to 5 selfies. Different angles and lighting help InFrame find you. Update them if your look changes a lot.</p>
+  openSheet(`${sheetHead('Face Scan', 'Save', 'saveFace()')}
+    <p class="hint">InFrame uses this to find you in friends' photos. Scan again if your look changes a lot.</p>
     <div class="box" id="facebox">${faceGrid()}</div>
     ${u.biometricConsentAt ? '' : `<label class="check"><input type="checkbox" id="f-consent"><span>I agree that InFrame may create a face template from my selfie, as described in the <a href="terms.html#biometric" target="_blank">Biometric Data Policy</a>.</span></label>`}
     <div class="list"><button class="cell tap red" onclick="removeFaceData()">Remove My Face Data</button></div>`);
 }
 async function saveFace(){
-  if (!faces.length) return toast('Add at least one selfie, or use Remove My Face Data.');
+  if (!faces.length) return toast('Do the face scan first, or use Remove My Face Data.');
   const c = $('#f-consent'); if (c && !c.checked) return toast('Please agree to face matching first.');
   const upd = faceFields(); if (c) upd.biometricConsentAt = Date.now();
-  if (!me().avatar) upd.avatar = faces[0].thumb;
-  await F.updateDoc(ref('users', ME), upd); closeSheet(); toast(`Saved ${plural(faces.length, 'selfie')}.`); faces = [];
+  if (!me().avatar) upd.avatar = randomAvatar();
+  await F.updateDoc(ref('users', ME), upd); closeSheet(); toast('Face scan saved.'); faces = [];
   setTimeout(() => rescanForMe(Object.keys({...C.sEvents, ...C.gEvents})), 500);
 }
 async function removeFaceData(){
@@ -2126,6 +2150,10 @@ async function installApp(){ if (!installEvt) return; installEvt.prompt(); try {
 /* ---------- What's New: newest update first. Add a new entry at the TOP with every update.
    People only see the updates that came out since they last looked (or just the newest, if they've never seen one). ---------- */
 const RELEASES = [
+  {v:'2026-11-19e', items:[
+    ['🙂', 'Smoother Face Scan', 'Face matching is now just the face scan. It follows your head live, fills the ring as you hold each pose, and shows arrows for which way to turn.'],
+    ['🎲', 'Random Avatars', 'New accounts start with a fun random avatar instead of a face scan photo. Tap Shuffle in Edit Profile to try another.'],
+  ]},
   {v:'2026-11-19d', items:[
     ['➕', 'Easier Posting', 'Tap Post, pick the group (or Single Events), then the event.'],
     ['📲', 'No Duplicate Saves', "InFrame remembers what you've saved. The button says Save New and shows exactly which photos will be saved. Tap a photo to leave it out, or tap I Already Have These."],
@@ -2267,7 +2295,7 @@ function screenEvent(){
     <div class="row" style="margin-top:12px;flex-wrap:nowrap"><label class="btn fill" style="flex:1;padding:15px;border-radius:14px">Upload<input type="file" accept="image/*,video/*" multiple hidden onchange="upload('${e.id}',this.files)"></label>
       <button class="btn tint" style="flex:1;padding:15px;border-radius:14px" onclick="requestSheet('${e.id}')">Request Photos</button></div>
     ${waitingOn(e.id).length ? `<div class="fnote" style="margin:8px 4px 0">Waiting on ${waitingOn(e.id).map(id => esc(handle(id))).join(', ')} to upload.</div>` : ''}
-    ${me()?.descriptor ? '' : `<div class="callout" style="margin-top:12px"><div style="flex:1">You don't have a face selfie yet, so photos of you won't be found automatically. <a href="#" onclick="faceSheet();return false" style="color:var(--accent)">Add Selfie</a></div></div>`}
+    ${me()?.descriptor ? '' : `<div class="callout" style="margin-top:12px"><div style="flex:1">You haven't done your face scan yet, so photos of you won't be found automatically. <a href="#" onclick="faceSheet();return false" style="color:var(--accent)">Do Face Scan</a></div></div>`}
     <div class="seg">${sb('mine', 'Of Me', mine.length)}${sb('all', 'Shared Album', all.length)}${sb('uploads', 'My Uploads', ups.length)}</div>
     ${list.length ? `${seg !== 'uploads' && saveBtn(list) ? `<div style="display:flex;justify-content:flex-end;align-items:center;margin:-4px 0 8px">${saveBtn(list)}</div>` : ''}<div class="grid">${list.map(p => tileHTML(p, ids, tag(p))).join('')}</div>` : `<div class="empty">${empty}</div>`}
     </div>`;
@@ -2296,7 +2324,7 @@ function screenProfile(){
     ${isIOS && !hasApp() ? `<div class="list"><button class="cell tap" onclick="homeScreenSheet()"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px;background:var(--accent);color:#fff">+</span><div class="main">Add To Home Screen</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
     ${isAdminNow() ? `<div class="list"><button class="cell tap" onclick="ADM=null;go({name:'admin',seg:'overview'})"><span class="sq" style="width:30px;height:30px;border-radius:8px;font-size:15px;background:var(--accent);color:#fff">A</span><div class="main">Admin Panel</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
     <div class="list"><button class="cell tap" onclick="editProfileSheet()"><div class="main">Edit Profile</div><span class="chev">›</span></button>
-      <button class="cell tap" onclick="faceSheet()"><div class="main">Face Match Selfies</div><span class="val">${userDescs(u).length ? userDescs(u).length + ' of 5' : 'Not Set'}</span><span class="chev">›</span></button>
+      <button class="cell tap" onclick="faceSheet()"><div class="main">Face Scan</div><span class="val">${userDescs(u).length ? 'Done' : 'Not Set'}</span><span class="chev">›</span></button>
       <button class="cell tap" onclick="${perm === 'granted' ? "toast('Notifications are on. Turn them off in your phone\\'s Settings.')" : 'enableNotifications()'}"><div class="main">Notifications</div><span class="val">${perm === 'granted' ? 'On' : 'Off'}</span><span class="chev">›</span></button></div>
     <div class="sechead">Appearance</div>
     <div class="seg" style="margin:0 0 4px">${[['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button class="${themeNow() === k ? 'on' : ''}" onclick="setTheme('${k}')">${l}</button>`).join('')}</div>
