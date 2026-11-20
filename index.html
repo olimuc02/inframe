@@ -117,6 +117,9 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;font-weight:700}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;transition:filter .15s}
 .tile .tag{position:absolute;left:6px;bottom:6px;font-size:11px;font-weight:700;background:var(--ink);color:var(--bg);padding:3px 8px;border-radius:99px}
 .tile .rx{position:absolute;right:6px;bottom:5px;font-size:13px}
+.qrbox{position:relative;width:min(62vw,230px);aspect-ratio:1;margin:18px auto 0;background:#fff;border-radius:18px;padding:10px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)}
+.qrbox svg{width:100%;height:100%;display:block}
+.qrbox img{position:absolute;width:20%;height:20%;left:40%;top:40%;border-radius:8px;background:#fff;padding:3px}
 .savepick .tick{position:absolute;right:6px;top:6px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff}
 .savepick.off img{opacity:.35;filter:grayscale(1)}
 .savepick.off .tick{background:rgba(0,0,0,.35);color:transparent}
@@ -662,14 +665,21 @@ async function doLogin(){
     if (!/@.+\./.test(who)){ // no "@something.com", so treat it as a username
       const e = await emailForUsername(cleanUsername(who), pw);
       if (e === null){ b.disabled = false; return toast("We couldn't find that username. Try your email, or Continue With Google."); }
-      if (e === false){ b.disabled = false; return toast('Username or password is incorrect.'); }
+      if (e === false){ b.disabled = false; return wrongPw("Username or password is incorrect. If you just reset your password, log in with your email this one time."); }
       email = e;
     }
     pendingPw = pw;
     await A.signInWithEmailAndPassword(AUTH, email, pw);
-  } catch (e){ pendingPw = null; authErr(e); }
+  } catch (e){ pendingPw = null; if (['auth/invalid-credential', 'auth/wrong-password', 'auth/invalid-login-credentials'].includes(e?.code)) wrongPw('Email or password is incorrect.'); else authErr(e); }
   b.disabled = false;
 }
+// Wrong password: say so, and put a "Reset Password" shortcut right under the button.
+function wrongPw(msg){
+  toast(msg);
+  if (!$('#pw-help')) $('#au-go')?.insertAdjacentHTML('afterend', `<div id="pw-help" class="callout" style="margin-top:12px"><div style="flex:1">Forgot your password? <a href="#" onclick="resetFrom();return false" style="color:var(--accent);font-weight:600">Reset It</a></div></div>`);
+}
+function resetFrom(){ const v = $('#au-email')?.value.trim() || ''; showAuth('reset'); if (/@.+\./.test(v)) setTimeout(() => { const i = $('#au-email'); if (i) i.value = v; }, 50); }
+const resetSettings = () => ({url:location.origin + location.pathname.replace(/index\.html$/, '') + '?reset=1'});
 async function doRegister(){
   const email = $('#au-email').value.trim(), pw = $('#au-pw').value;
   if (!email) return toast('Enter your email.');
@@ -681,7 +691,21 @@ async function doRegister(){
 async function doGoogle(){ try { await A.signInWithPopup(AUTH, new A.GoogleAuthProvider()); } catch (e){ authErr(e); } }
 async function doReset(){
   const email = $('#au-email').value.trim(); if (!email) return toast('Enter your email first.');
-  try { await A.sendPasswordResetEmail(AUTH, email); toast('Check your email for a link to reset your password.'); showAuth('login'); } catch (e){ authErr(e); }
+  const b = $('#au-go'); if (b) b.disabled = true;
+  try { await A.sendPasswordResetEmail(AUTH, email, resetSettings()); }
+  catch (e){ if (e?.code === 'auth/unauthorized-continue-uri' || e?.code === 'auth/invalid-continue-uri'){ try { await A.sendPasswordResetEmail(AUTH, email); } catch (e2){ if (b) b.disabled = false; return authErr(e2); } } else { if (b) b.disabled = false; return authErr(e); } }
+  $('#auth').innerHTML = `<button class="back plain" onclick="showAuth('login')">${chevron} Back</button>
+    <h1 style="margin-top:20px">Check Your Email</h1><p class="hint">If there's an InFrame account for <b>${esc(email)}</b>, we sent a link to choose a new password. It can take a minute, and it might land in Spam.</p>
+    <p class="hint">After you pick a new password, come back and log in with your <b>email</b> the first time. Your username will work again after that.</p>
+    <button class="btn fill full" onclick="showAuth('login')">Back To Log In</button>
+    <button class="link" onclick="doReset.again()">Send It Again</button>`;
+  doReset.again = () => { showAuth('reset'); setTimeout(() => { const i = $('#au-email'); if (i){ i.value = email; } }, 50); };
+}
+async function changePassword(){
+  const email = AUTH?.currentUser?.email; if (!email) return;
+  if (!confirm(`We'll email a link to ${email} so you can choose a new password. Send it?`)) return;
+  try { await A.sendPasswordResetEmail(AUTH, email, resetSettings()); } catch { try { await A.sendPasswordResetEmail(AUTH, email); } catch (e){ return authErr(e); } }
+  toast('Check your email for the link. Use your email to log in the first time after.');
 }
 async function logOut(){ closeSheet(); localStorage.removeItem('inframe_viewas'); try { await A.signOut(AUTH); } catch {} routeAuth(); toast('Logged out.'); }
 /* hand-drawn instant-film prints for the landing page */
@@ -731,9 +755,10 @@ function renderAuth(){
     <div class="grow"></div><p class="hint" style="margin-top:22px">Already have an account? <a href="#" onclick="showAuth('login');return false" style="color:var(--link);font-weight:600">Log In</a></p></div>`;
   else if (authScreen === 'reset') html = `<div class="onb" id="auth">
     <button class="back plain" onclick="showAuth('login')">${chevron} Back</button>
-    <h1 style="margin-top:20px">Reset Password</h1><p class="hint">Enter your email and we'll send you a link to choose a new password.</p>
-    <div class="field"><label><span>Email</span><input id="au-email" type="email" autocomplete="email" autocapitalize="none" placeholder="you@email.com"></label></div>
-    <button class="btn fill full" onclick="doReset()">Send Reset Link</button></div>`;
+    <h1 style="margin-top:20px">Reset Password</h1><p class="hint">Enter the email you signed up with and we'll send you a link to choose a new password.</p>
+    <div class="field"><label><span>Email</span><input id="au-email" type="email" autocomplete="email" autocapitalize="none" placeholder="you@email.com" onkeydown="if(event.key==='Enter')doReset()"></label></div>
+    <button class="btn fill full" id="au-go" onclick="doReset()">Send Reset Link</button>
+    <p class="fnote" style="text-align:center;margin-top:12px">Signed up with Google? You don't have an InFrame password. Use Continue With Google instead.</p></div>`;
   else html = `<div class="lp" id="auth">
     <div class="lp-navw"><nav class="lp-nav"><a class="lp-brand" href="./"><img src="icon-192.png" alt="">InFrame</a><span class="spacer"></span>
       <button class="lp-login" onclick="showAuth('login')">Log In</button><button class="btn fill" onclick="showAuth('signup')">Start A Group</button></nav></div>
@@ -1442,9 +1467,22 @@ function inviteSheet(kind, id){
   const t = kind === 'group' ? C.groups[id] : evt(id), link = inviteLink(kind, id);
   openSheet(`${sheetHead('Invite Friends')}
     <div class="hero">${sq(t, true)}<h1>${esc(t.name)}</h1><div class="s">Anyone with this link can join and get the photos they're in.</div></div>
-    <div style="height:18px"></div><div class="linkbox">${esc(link)}</div>
+    <div class="qrbox" id="qrbox"><span class="spin"></span></div>
+    <div class="fnote" style="text-align:center;margin:8px 0 14px">Friends can scan this with their phone camera to join.</div>
+    <div class="linkbox">${esc(link)}</div>
     <div class="row">${navigator.share ? `<button class="btn fill" style="flex:1" onclick="shareInvite('${kind}','${id}')">Share Link</button>` : ''}
     <button class="btn tint" style="flex:1" onclick="copyText('${esc(link)}')">Copy Link</button></div>`);
+  drawQR(link);
+}
+// QR code for the invite link (drawn on the phone, nothing sent anywhere).
+async function drawQR(text){
+  try {
+    if (!window.qrcode) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js');
+    const q = qrcode(0, 'Q'); q.addData(text); q.make();
+    const n = q.getModuleCount(), cells = [];
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) cells.push(`M${c} ${r}h1v1h-1z`);
+    const box = $('#qrbox'); if (box) box.innerHTML = `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" shape-rendering="crispEdges"><rect x="-2" y="-2" width="${n + 4}" height="${n + 4}" fill="#fff"/><path d="${cells.join('')}" fill="#161513"/></svg><img src="icon-192.png" alt="">`;
+  } catch { const box = $('#qrbox'); if (box) box.remove(); }
 }
 async function shareInvite(kind, id){ const t = kind === 'group' ? C.groups[id] : evt(id); try { await navigator.share({title:'InFrame', text:`Join ${t.name} on InFrame so we all get our photos`, url:inviteLink(kind, id)}); } catch {} }
 async function copyText(t){ try { await navigator.clipboard.writeText(t); toast('Copied.'); } catch { toast('Press and hold the link to copy it.'); } }
@@ -2150,6 +2188,10 @@ async function installApp(){ if (!installEvt) return; installEvt.prompt(); try {
 /* ---------- What's New: newest update first. Add a new entry at the TOP with every update.
    People only see the updates that came out since they last looked (or just the newest, if they've never seen one). ---------- */
 const RELEASES = [
+  {v:'2026-11-19f', items:[
+    ['📷', 'QR Codes For Invites', 'Tap Invite to show a QR code. Friends scan it with their camera to join.'],
+    ['🔑', 'Easier Password Reset', 'Forgot your password? There is a Reset It shortcut right on the log-in screen, and Change Password in Profile.'],
+  ]},
   {v:'2026-11-19e', items:[
     ['🙂', 'Smoother Face Scan', 'Face matching is now just the face scan. It follows your head live, fills the ring as you hold each pose, and shows arrows for which way to turn.'],
     ['🎲', 'Random Avatars', 'New accounts start with a fun random avatar instead of a face scan photo. Tap Shuffle in Edit Profile to try another.'],
@@ -2333,6 +2375,7 @@ function screenProfile(){
     <div class="list"><div class="cell"><div class="main">Logged In As</div><span class="val" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(AUTH?.currentUser?.email || '')}</span></div>
       <a class="cell tap" href="terms.html" target="_blank" style="color:inherit;text-decoration:none"><div class="main">Terms & Privacy</div><span class="chev">›</span></a></div>
     <div style="height:24px"></div>
+    ${AUTH?.currentUser?.providerData?.some(p => p.providerId === 'password') ? `<div class="list"><button class="cell tap" onclick="changePassword()"><div class="main">Change Password</div><span class="chev">›</span></button></div><div style="height:24px"></div>` : ''}
     <div class="list"><button class="cell tap blue" onclick="logOut()">Log Out</button>${isAdminId(ME) ? '' : `<button class="cell tap red" onclick="deleteAccount()">Delete Account</button>`}</div>
     <p class="hint" style="text-align:center;margin-top:20px;font-size:13px">InFrame · Prototype</p></div>`;
 }
@@ -2370,6 +2413,7 @@ function start(){ stopAll(); stack = []; view = {name:'tab', tab:'groups'}; if (
   try { await initFirebase(); } catch (e){ $('#app').innerHTML = '<div class="empty" style="padding-top:30vh"><b>Can\'t Connect</b>Check your internet connection and reopen InFrame.</div>'; return; }
   const p = new URLSearchParams(location.search);
   if (p.get('join')) sessionStorage.setItem('inframe_join', p.get('join'));
+  if (p.get('reset')){ history.replaceState(null, '', location.pathname); setTimeout(() => { if (!ME){ showAuth('login'); toast('Password changed. Log in with your email and new password.'); } }, 600); }
   if (p.has('admin') && !adminAuthed()) adminEntry = true;
   if (p.toString()) history.replaceState(null, '', location.pathname);
   ['inframe_me', 'inframe_accounts', 'inframe_admin_return'].forEach(k => localStorage.removeItem(k)); // old device-only accounts
